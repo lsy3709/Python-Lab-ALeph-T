@@ -310,6 +310,15 @@ def create_incident():
   actor = getattr(request, 'actor', 'unknown')
   hours = int(data.get('hours') or 24)
   since = datetime.now() - timedelta(hours=hours)
+  # 같은 키의 '마지막으로 종료된 티켓' 이후 사건만 취합한다 — 이미 처리·종료한 사건을
+  # 새 티켓이 다시 흡수하지 않게([129] E2E 에서 발견). 같은 초 경계는 포함(>=) 쪽으로:
+  # 새 증거를 놓치는 것보다 한 건 겹치는 편이 안전하다.
+  last_closed = (Incident.query
+                 .filter(Incident.src_ip == src_ip, Incident.status == 'closed',
+                         Incident.closed_at.isnot(None))
+                 .order_by(Incident.closed_at.desc()).first())
+  if last_closed and last_closed.closed_at > since:
+    since = last_closed.closed_at
   events = (SecurityEvent.query
             .filter(SecurityEvent.src_ip == src_ip, SecurityEvent.created_at >= since)
             .order_by(SecurityEvent.created_at.desc()).all())
@@ -322,7 +331,10 @@ def create_incident():
   if not inc:
     inc = Incident(src_ip=src_ip, status='open'); db.session.add(inc); created = True
   inc.title = title
-  inc.severity = severity
+  # 심각도는 '내려가지 않는다': 요청값·취합 최고값·기존 티켓 값 중 가장 높은 것
+  # (Critical 티켓에 나중에 Medium 경보가 합쳐져도 Critical 유지 — [129] E2E 에서 발견해 수정)
+  inc.severity = max((severity, worst, inc.severity or 'Low'),
+                     key=lambda s: _SEV_RANK.get(s, 0))
   inc.summary = summary
   inc.event_count = cnt
   inc.actions = actions[:255]

@@ -28,6 +28,12 @@ class Config:
   GELF_HOST = os.environ.get('GELF_HOST', 'localhost')
   GELF_PORT = int(os.environ.get('GELF_PORT', '12201'))
 
+  # ── 보안 로그 파일 (호스트의 Wazuh 에이전트가 읽어 감) ──
+  # 기본: 이 프로젝트 폴더의 logs/security.log. 비우면 파일 기록을 끈다.
+  SECURITY_LOG_PATH = os.environ.get(
+      'SECURITY_LOG_PATH',
+      os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs', 'security.log'))
+
   # ── 보안 이벤트 REST (n8n 이 호출) ──
   # 값이 비어 있으면 POST 는 항상 401 (fail-closed: 실수로 열어두지 않는다)
   SECURITY_API_KEY = os.environ.get('SECURITY_API_KEY', '')
