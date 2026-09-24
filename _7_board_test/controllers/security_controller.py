@@ -8,6 +8,7 @@ from functools import wraps
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.security import generate_password_hash
 
+from .gelf import send_gelf
 from extensions import db
 from models import Incident, Post, SecurityEvent, User
 
@@ -20,6 +21,15 @@ def require_api_key(fn):
   def wrapper(*args, **kwargs):
     expected = current_app.config.get('SECURITY_API_KEY', '')
     if not expected or request.headers.get('X-API-Key', '') != expected:
+      # S6 인증 공격 탐지 — 키를 추측해 두드리는 것을 신고한다.
+      # 시도된 키 값 자체는 절대 남기지 않는다(그 자체가 비밀 후보다).
+      try:
+        send_gelf(f"admin api auth failed {request.path[:80]}", rule='admin-auth-fail',
+                  src_ip=(request.headers.get('X-Forwarded-For', request.remote_addr)
+                          or '0.0.0.0').split(',')[0].strip(),
+                  path=request.path[:120], code=401)
+      except Exception:
+        pass
       return jsonify({'msg': 'API 키가 없거나 잘못되었습니다.'}), 401
     return fn(*args, **kwargs)
   return wrapper
