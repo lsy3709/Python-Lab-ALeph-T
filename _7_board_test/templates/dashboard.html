@@ -55,6 +55,53 @@
       <div id="top-ips" class="space-y-2 text-sm text-gray-500">불러오는 중…</div>
     </section>
 
+    <!-- 인시던트 티켓 (여러 이벤트를 한 사건으로 묶은 것) -->
+    <section class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+      <div class="p-4 flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h3 class="font-semibold">📋 인시던트 티켓</h3>
+          <p class="text-xs text-gray-400 mt-0.5">
+            같은 출발지의 이벤트를 <b>한 사건</b>으로 묶은 기록 — 열린 티켓은 아직 대응이 안 끝난 것
+          </p>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="text-xs text-gray-500">
+            열림 <b id="inc-open" class="text-red-600">-</b>
+            · 종료 <b id="inc-closed" class="text-gray-500">-</b>
+            <span id="inc-sev" class="text-gray-400"></span>
+          </div>
+          <div class="flex gap-1 text-xs">
+            <button data-status="" class="inc-btn px-2 py-1 rounded bg-indigo-600 text-white">전체</button>
+            <button data-status="open" class="inc-btn px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">열림</button>
+            <button data-status="closed" class="inc-btn px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">종료</button>
+          </div>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm whitespace-nowrap">
+          <thead class="bg-gray-50 text-gray-600">
+            <tr>
+              <th class="text-left px-4 py-2 font-medium">#</th>
+              <th class="text-left px-4 py-2 font-medium">출발지 IP</th>
+              <th class="text-left px-4 py-2 font-medium">심각도</th>
+              <th class="text-left px-4 py-2 font-medium">상태</th>
+              <th class="text-left px-4 py-2 font-medium">관련 이벤트</th>
+              <th class="text-left px-4 py-2 font-medium">조치</th>
+              <th class="text-left px-4 py-2 font-medium">제목</th>
+              <th class="text-left px-4 py-2 font-medium">생성 시각</th>
+              <th class="text-left px-4 py-2 font-medium">종료 시각</th>
+            </tr>
+          </thead>
+          <tbody id="incident-rows" class="divide-y divide-gray-100">
+            <tr><td colspan="9" class="px-4 py-6 text-center text-gray-400">불러오는 중…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="px-4 py-2 text-xs text-gray-400 border-t">
+        티켓 생성·종료는 관리자 API(<code>/api/admin/incident</code>, <code>/incident/close</code>)에서 한다 — 이 화면은 <b>읽기 전용</b>.
+      </p>
+    </section>
+
     <!-- 최근 이벤트 -->
     <section class="bg-white rounded-xl shadow-sm overflow-hidden">
       <div class="p-4 flex items-center justify-between">
@@ -89,12 +136,14 @@
 
     <p class="text-xs text-gray-400 mt-4">
       데이터 출처: <code>GET /api/security/events</code> · <code>GET /api/security/events/summary</code>
+      · <code>GET /api/security/incidents</code> · <code>GET /api/security/incidents/summary</code>
       — n8n 워크플로우가 <code>POST /api/security/events</code> 로 저장한 기록입니다.
     </p>
   </main>
 
   <script>
     let currentDecision = '';
+    let currentStatus = '';
 
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
       c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -169,7 +218,47 @@
         </tr>`).join('');
     }
 
-    function reload() { loadSummary(); loadEvents(); }
+    const statusBadge = (st) => st === 'open'
+      ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">🔴 열림</span>'
+      : '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">✅ 종료</span>';
+
+    async function loadIncidentSummary() {
+      const q = studentParam();
+      const r = await fetch('/api/security/incidents/summary' + (q ? '?' + q : ''));
+      const d = await r.json();
+      const st = d.by_status || {};
+      document.getElementById('inc-open').textContent = st.open ?? 0;
+      document.getElementById('inc-closed').textContent = st.closed ?? 0;
+      const sev = Object.entries(d.open_by_severity || {})
+        .map(([k, v]) => k + ' ' + v).join(' · ');
+      document.getElementById('inc-sev').textContent = sev ? '(열림 ' + sev + ')' : '';
+    }
+
+    async function loadIncidents() {
+      const parts = [studentParam(), currentStatus ? 'status=' + currentStatus : '', 'limit=50']
+        .filter(Boolean).join('&');
+      const r = await fetch('/api/security/incidents?' + parts);
+      const d = await r.json();
+      const tbody = document.getElementById('incident-rows');
+      if (!d.incidents || d.incidents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-gray-400">티켓이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = d.incidents.map(t => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2 text-gray-400">${t.id}</td>
+          <td class="px-4 py-2 font-mono">${esc(t.src_ip)}</td>
+          <td class="px-4 py-2 font-medium ${sevColor(t.severity)}">${esc(t.severity)}</td>
+          <td class="px-4 py-2">${statusBadge(t.status)}</td>
+          <td class="px-4 py-2">${t.event_count}</td>
+          <td class="px-4 py-2 text-gray-600">${esc(t.actions)}</td>
+          <td class="px-4 py-2 text-gray-600 max-w-xs truncate" title="${esc(t.summary)}">${esc(t.title)}</td>
+          <td class="px-4 py-2 text-gray-400">${esc((t.created_at || '').replace('T', ' ').slice(0, 19))}</td>
+          <td class="px-4 py-2 text-gray-400">${esc((t.closed_at || '-').replace('T', ' ').slice(0, 19))}</td>
+        </tr>`).join('');
+    }
+
+    function reload() { loadSummary(); loadEvents(); loadIncidentSummary(); loadIncidents(); }
 
     document.getElementById('refresh-btn').addEventListener('click', () => { loadStudents(); reload(); });
     document.getElementById('student-filter').addEventListener('change', reload);
@@ -181,6 +270,17 @@
             (b === btn ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200');
         });
         loadEvents();
+      });
+    });
+
+    document.querySelectorAll('.inc-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentStatus = btn.dataset.status;
+        document.querySelectorAll('.inc-btn').forEach(b => {
+          b.className = 'inc-btn px-2 py-1 rounded ' +
+            (b === btn ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200');
+        });
+        loadIncidents();
       });
     });
 
