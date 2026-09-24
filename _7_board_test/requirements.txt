@@ -1,0 +1,17 @@
+# Dependencies for the lab board app (_7_board_test)
+#   install:  pip install -r requirements.txt
+# NOTE: keep this file ASCII-only. pip on Korean Windows reads it as cp949,
+#       so non-ASCII comments break installation with UnicodeDecodeError.
+# Versions verified on the instructor PC, 2026-09-25.
+
+Flask==3.0.2
+Flask-SQLAlchemy==3.1.1
+Flask-JWT-Extended==4.6.0
+SQLAlchemy==2.0.52
+PyMySQL==1.1.0
+python-dotenv==1.2.3
+requests==2.34.2
+Werkzeug==3.0.1
+
+# tests only
+pytest==9.1.1
