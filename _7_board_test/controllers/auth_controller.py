@@ -57,6 +57,13 @@ def login():
   if user.failed_logins:
     user.failed_logins = 0
     db.session.commit()
+  # 성공도 남긴다. 실패만 모으면 "누가 결국 뚫렸는가"를 알 수 없다 —
+  # 심야 접속·계정 탈취·한 계정 다중 IP 같은 탐지는 전부 성공 기록이 있어야 만든다.
+  # 남기는 값은 계정명·출발지 IP 뿐(비밀번호·토큰은 절대 남기지 않는다).
+  send_gelf(f"successful login for '{username}' from {src_ip}",
+            rule='login-success', username=username, src_ip=src_ip,
+            role=user.role or '')
+  write_seclog('login_success', username, src_ip)
   token = create_access_token(identity=str(user.id))
   # role 을 함께 내려주면 화면이 곧바로 등급에 맞는 메뉴를 그릴 수 있다.
   return jsonify(access_token=token, username=user.username,
