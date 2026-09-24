@@ -68,15 +68,33 @@ def create_app(config_class=Config):
     db.create_all()
     _ensure_schema()   # 기존 users 표에 role 컬럼 보강
 
+  def _is_trusted_automation():
+    """유효한 API 키(보안/관리자)를 제시한 요청인가 — SOAR 봇 판별용.
+
+    키가 설정돼 있지 않으면(빈 값) 어떤 요청도 신뢰하지 않는다(fail-closed).
+    """
+    key = request.headers.get('X-API-Key', '')
+    if not key:
+      return False
+    valid = {app.config.get('SECURITY_API_KEY') or '',
+             app.config.get('ADMIN_API_KEY') or ''} - {''}
+    return key in valid
+
   @app.before_request
   def _block_ip_guard():
     """실차단(active response): 차단된 IP 의 요청은 앱에 닿기 전에 403 으로 되돌린다.
 
     - 관리자 API(/api/admin/*) 는 예외 — 그래야 운영자·n8n 이 차단/해제를 계속 할 수 있다
       (자기 자신을 잠가 복구 불능이 되는 것을 막는 안전장치).
+    - ★ **유효한 API 키를 제시한 자동화(SOAR) 요청도 예외**다. 2026-09-24 실측:
+      브루트포스 대응으로 SOAR 가 127.0.0.1 을 차단하자, 같은 호스트에서 오던
+      [129] Wazuh 경보봇의 `/api/security/events` 기록까지 403 이 되어 봇이 3회 연속
+      실패했다(자기차단). 사람이 아닌 인증된 봇은 차단 대상이 아니다.
     - 매 요청 blocked_ips 표를 조회한다. 랩 규모에선 충분하고, 실서비스는
       캐시(예: Redis)나 방화벽(nftables) 계층으로 올려야 한다."""
     if request.path.startswith('/api/admin'):
+      return None
+    if _is_trusted_automation():
       return None
     ip = _client_ip()
     if ip and db.session.get(BlockedIP, ip):
