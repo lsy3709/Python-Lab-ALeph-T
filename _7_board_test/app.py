@@ -99,6 +99,13 @@ def create_app(config_class=Config):
       return None
     ip = _client_ip()
     if ip and db.session.get(BlockedIP, ip):
+      # S5 지속성 탐지 — 차단됐는데도 계속 두드리는 것을 신고한다.
+      # 403 만 주고 끝내면 '공격이 멈췄는지'를 알 수 없다.
+      try:
+        send_gelf(f"blocked ip retried {request.path[:80]}", rule='blocked-retry',
+                  src_ip=ip, path=request.path[:120], code=403)
+      except Exception:
+        pass
       return jsonify({'msg': '차단된 IP 입니다(관리자에게 문의).', 'ip': ip, 'blocked': True}), 403
     return None
 
