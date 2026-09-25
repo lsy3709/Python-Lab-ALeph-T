@@ -1,0 +1,41 @@
+LLM_API_KEY=sk-dummy-1234567890abcdef
+PUBLIC_API_KEY=ALRX9GpugtvHxcIO/iPg1vXIQKi0E6Kk1ns4imt8BLTgdvSlH/AKv+A1GcGUQgzuzqM3Uv1ZGgpG5erOTDcY
+DATABASE_URL=mysql+pymysql://root:123456@localhost:3306/my_new_board_db
+# ─────────────────────────────────────────────────────────────
+# .env.example  —  이 파일을 복사해 `.env` 로 만든 뒤 각자 값을 채운다.
+#   copy .env.example .env      (cmd)
+#   Copy-Item .env.example .env (PowerShell)
+#
+# `.env` 는 .gitignore 대상이라 깃에 올라가지 않는다.
+# 이 파일(.env.example)에는 실제 값을 절대 적지 않는다.
+# 자세한 설명: docs/004_DB_계정정보_변경.md
+# ─────────────────────────────────────────────────────────────
+
+# ── ① DB 접속 (각자 본인 것으로 바꿀 것) ──
+# 형식: mysql+pymysql://<계정>:<비밀번호>@<주소>:<포트>/<DB이름>
+# 비밀번호에 @ # / : 등 특수문자가 있으면 반드시 URL 인코딩할 것 (@ -> %40, # -> %23)
+# DATABASE_URL=mysql+pymysql://<계정>:<비밀번호>@localhost:3306/my_new_board_db
+
+# ── ② 로그인 토큰 서명 키 ──
+# 아무 긴 랜덤 문자열. 만드는 법:
+#   python -c "import secrets; print(secrets.token_urlsafe(32))"
+JWT_SECRET_KEY=FzThN4DM3UVaH260wRR44um4XMzzsE0bPsgm1i15USc
+
+# ── ③ 보안 이벤트 REST 용 API 키 (n8n 과 공유) ──
+# 비어 있으면 POST /api/security/events 는 항상 401 (fail-closed)
+SECURITY_API_KEY=vivjXzholnhdQdYYqmM8mcECfd3vv_R36lugiTbis9s
+
+
+# ── ④ 거부(deny) 시 게시판에 '보안' 공지글 자동 등록 ──
+# 공용 게시판이라 기본 0 (켜면 학생 수만큼 글이 쌓임)
+AUTO_POST_ON_DENY=0
+
+# ── ④-b 관리자(인가) REST 용 키 (회수봇·n8n 이 /api/admin/* 호출 시) ──
+# 비어 있으면 SECURITY_API_KEY 로 대체된다. 사람은 관리자 페이지에서 admin 로그인.
+# ADMIN_API_KEY=<32자 이상 랜덤 문자열>
+# admin 을 가져도 되는 계정(정책 허용목록). 이 밖의 admin 은 '과잉권한'으로 회수 대상.
+ADMIN_ALLOWLIST=lsy,admin
+
+# ── ⑤ 공공데이터포털 서비스 키 (부산 테마여행) ──
+# https://www.data.go.kr 에서 발급받은 '일반 인증키(Decoding)'
+# PUBLIC_API_KEY=<공공데이터포털 서비스키>

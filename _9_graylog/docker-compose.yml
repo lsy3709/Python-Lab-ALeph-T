@@ -1,0 +1,47 @@
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: gl-mongo
+    volumes: [ "mongo_data:/data/db" ]
+    restart: unless-stopped
+
+  opensearch:
+    image: opensearchproject/opensearch:2.5.0     # ★ 2.15 는 색인 NPE — 반드시 2.5.0 ([106] 함정①)
+    container_name: gl-opensearch
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "bootstrap.memory_lock=true"
+      - "discovery.type=single-node"
+      - "action.auto_create_index=false"
+      - "plugins.security.disabled=true"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=123456"
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile:  { soft: 65536, hard: 65536 }
+    volumes: [ "os_data:/usr/share/opensearch/data" ]
+    restart: unless-stopped
+
+  graylog:
+    image: graylog/graylog:6.1
+    container_name: gl-graylog
+    environment:
+      - GRAYLOG_PASSWORD_SECRET=e7b29a4c8f1e3d6a9c2f5b8e1a4d7c0f3b6e9a2d5f8c1e4b7a0d3f6c9e2b5a8f      # openssl rand -hex 48
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918  # 'admin'
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://127.0.0.1:9000/
+      - GRAYLOG_MONGODB_URI=mongodb://gl-mongo:27017/graylog
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://gl-opensearch:9200
+      # ★ GRAYLOG_ELASTICSEARCH_VERSION 은 넣지 않는다(자동감지) — 넣으면 types 거부 ([106] 함정②)
+      - GRAYLOG_ROOT_TIMEZONE=Asia/Seoul                      # ★ 없으면 UTC라 시각이 KST와 9시간 어긋남([104] 2-4)
+      - TZ=Asia/Seoul
+    extra_hosts: [ "host.docker.internal:host-gateway" ]     # n8n·게시판(호스트) 호출용
+    depends_on: [ mongodb, opensearch ]
+    ports:
+      - "9000:9000"          # 웹 UI
+      - "12201:12201/udp"    # GELF UDP
+      - "12201:12201/tcp"    # GELF TCP
+      - "1514:1514/udp"      # Syslog UDP
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  os_data:
