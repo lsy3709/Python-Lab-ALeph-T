@@ -1,0 +1,994 @@
+{
+  "format": "zbx7-dashboard-portable-v1",
+  "exported_at_utc": "2026-10-20T05:21:29.486720+00:00",
+  "dashboard": {
+    "dashboardid": "401",
+    "name": "SOAR 서비스 가용성 모니터링",
+    "userid": "1",
+    "private": "1",
+    "display_period": "30",
+    "auto_start": "1",
+    "uuid": "",
+    "pages": [
+      {
+        "dashboard_pageid": "28018",
+        "name": "",
+        "display_period": "0",
+        "widgets": [
+          {
+            "widgetid": "111097",
+            "type": "item",
+            "name": "게시판 (5000)",
+            "x": "2",
+            "y": "0",
+            "width": "21",
+            "height": "3",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "50761"
+              },
+              {
+                "type": "1",
+                "name": "bg_color",
+                "value": "FF0000"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "00FF00"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "widgetid": "111098",
+            "type": "item",
+            "name": "Graylog (9000)",
+            "x": "23",
+            "y": "0",
+            "width": "22",
+            "height": "3",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "50762"
+              },
+              {
+                "type": "1",
+                "name": "bg_color",
+                "value": "FF0000"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "00FF00"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "widgetid": "111099",
+            "type": "item",
+            "name": "Wazuh (443)",
+            "x": "45",
+            "y": "0",
+            "width": "24",
+            "height": "3",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "50763"
+              },
+              {
+                "type": "1",
+                "name": "bg_color",
+                "value": "FF0000"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "00FF00"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "widgetid": "111100",
+            "type": "item",
+            "name": "MySQL (3306)",
+            "x": "2",
+            "y": "3",
+            "width": "21",
+            "height": "3",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "50764"
+              },
+              {
+                "type": "1",
+                "name": "bg_color",
+                "value": "FF0000"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "00FF00"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "widgetid": "111101",
+            "type": "item",
+            "name": "n8n (5678)",
+            "x": "23",
+            "y": "3",
+            "width": "22",
+            "height": "3",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "50765"
+              },
+              {
+                "type": "1",
+                "name": "bg_color",
+                "value": "FF0000"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "00FF00"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "widgetid": "111102",
+            "type": "problems",
+            "name": "SOAR 서비스 장애 현황",
+            "x": "0",
+            "y": "6",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "0",
+                "name": "show",
+                "value": "3"
+              },
+              {
+                "type": "2",
+                "name": "groupids.0",
+                "value": "22"
+              },
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10688"
+              },
+              {
+                "type": "0",
+                "name": "severities.0",
+                "value": "4"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "10"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "XCBTC"
+              }
+            ]
+          },
+          {
+            "widgetid": "111103",
+            "type": "svggraph",
+            "name": "게시판 가용성 추이",
+            "x": "36",
+            "y": "6",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "기존 SOAR 스택(가용성)"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "게시판(5000) 가용성"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "TECWU"
+              }
+            ]
+          },
+          {
+            "widgetid": "111104",
+            "type": "svggraph",
+            "name": "Graylog 가용성 추이",
+            "x": "0",
+            "y": "11",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "기존 SOAR 스택(가용성)"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "Graylog(9000) 가용성"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "PWQTR"
+              }
+            ]
+          },
+          {
+            "widgetid": "111105",
+            "type": "svggraph",
+            "name": "Wazuh 가용성 추이",
+            "x": "37",
+            "y": "11",
+            "width": "35",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "기존 SOAR 스택(가용성)"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "Wazuh 대시보드(443) 가용성"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "QREVY"
+              }
+            ]
+          },
+          {
+            "widgetid": "111106",
+            "type": "svggraph",
+            "name": "MySQL 가용성 추이",
+            "x": "1",
+            "y": "16",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "기존 SOAR 스택(가용성)"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "MySQL(3306) 가용성"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "ZCCVQ"
+              }
+            ]
+          },
+          {
+            "widgetid": "111107",
+            "type": "svggraph",
+            "name": "n8n 가용성 추이",
+            "x": "37",
+            "y": "16",
+            "width": "33",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "기존 SOAR 스택(가용성)"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "n8n(5678) 가용성"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "HNHXW"
+              }
+            ]
+          },
+          {
+            "widgetid": "111108",
+            "type": "svggraph",
+            "name": "Windows CPU 사용률",
+            "x": "0",
+            "y": "21",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "lefty_min",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "lefty_max",
+                "value": "100"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "ZMWSN"
+              },
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "50767"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FFD54F"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              }
+            ]
+          },
+          {
+            "widgetid": "111109",
+            "type": "svggraph",
+            "name": "Windows RAM 사용률",
+            "x": "36",
+            "y": "21",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "lefty_min",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "lefty_max",
+                "value": "100"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "XTJVO"
+              },
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "50772"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              }
+            ]
+          },
+          {
+            "widgetid": "111110",
+            "type": "svggraph",
+            "name": "Graylog CPU 사용률",
+            "x": "0",
+            "y": "26",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51571"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "1",
+                "name": "lefty_min",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "lefty_max",
+                "value": "100"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "ICRZE"
+              }
+            ]
+          },
+          {
+            "widgetid": "111111",
+            "type": "svggraph",
+            "name": "Graylog 메모리 사용률",
+            "x": "38",
+            "y": "26",
+            "width": "34",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51586"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "FMETE"
+              }
+            ]
+          },
+          {
+            "widgetid": "111112",
+            "type": "svggraph",
+            "name": "Wazuh CPU",
+            "x": "0",
+            "y": "31",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51561"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "IQTXL"
+              }
+            ]
+          },
+          {
+            "widgetid": "111113",
+            "type": "svggraph",
+            "name": "Wazuh RAM",
+            "x": "38",
+            "y": "31",
+            "width": "29",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51562"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "VYXDS"
+              }
+            ]
+          },
+          {
+            "widgetid": "111114",
+            "type": "svggraph",
+            "name": "MySQL CPU",
+            "x": "0",
+            "y": "36",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51643"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "GCPSE"
+              }
+            ]
+          },
+          {
+            "widgetid": "111115",
+            "type": "svggraph",
+            "name": "MySQL RAM",
+            "x": "36",
+            "y": "36",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51658"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "NOVWW"
+              }
+            ]
+          },
+          {
+            "widgetid": "111116",
+            "type": "svggraph",
+            "name": "n8n CPU",
+            "x": "0",
+            "y": "41",
+            "width": "36",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51667"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "GXPWV"
+              }
+            ]
+          },
+          {
+            "widgetid": "111117",
+            "type": "svggraph",
+            "name": "n8n RAM",
+            "x": "37",
+            "y": "41",
+            "width": "35",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "ds.0.itemids.0",
+                "value": "51682"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color.0",
+                "value": "FF465C"
+              },
+              {
+                "type": "0",
+                "name": "ds.0.dataset_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-1h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "reference",
+                "value": "MDIOW"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "references": {
+    "4:50761": {
+      "kind": "item",
+      "host": "existing-stack",
+      "key": "net.tcp.service[tcp,host.docker.internal,5000]"
+    },
+    "4:50762": {
+      "kind": "item",
+      "host": "existing-stack",
+      "key": "net.tcp.service[tcp,host.docker.internal,9000]"
+    },
+    "4:50763": {
+      "kind": "item",
+      "host": "existing-stack",
+      "key": "net.tcp.service[tcp,host.docker.internal,443]"
+    },
+    "4:50764": {
+      "kind": "item",
+      "host": "existing-stack",
+      "key": "net.tcp.service[tcp,host.docker.internal,3306]"
+    },
+    "4:50765": {
+      "kind": "item",
+      "host": "existing-stack",
+      "key": "net.tcp.service[tcp,host.docker.internal,5678]"
+    },
+    "2:22": {
+      "kind": "hostgroup",
+      "name": "HA-lab-targets"
+    },
+    "3:10688": {
+      "kind": "host",
+      "host": "existing-stack"
+    },
+    "4:50767": {
+      "kind": "item",
+      "host": "win-docker-host",
+      "key": "system.cpu.util"
+    },
+    "4:50772": {
+      "kind": "item",
+      "host": "win-docker-host",
+      "key": "vm.memory.util"
+    },
+    "4:51571": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.cpu_pct_usage[\"/gl-graylog\"]"
+    },
+    "4:51586": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.memory.usage_total[\"/gl-graylog\"]"
+    },
+    "4:51561": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.cpu_usage.total.rate[\"/wazuh-manager\"]"
+    },
+    "4:51562": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.memory.usage_total[\"/wazuh-manager\"]"
+    },
+    "4:51643": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.cpu_pct_usage[\"/mysql-server\"]"
+    },
+    "4:51658": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.memory.usage_total[\"/mysql-server\"]"
+    },
+    "4:51667": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.cpu_pct_usage[\"/n8n\"]"
+    },
+    "4:51682": {
+      "kind": "item",
+      "host": "docker-engine",
+      "key": "docker.container_stats.memory.usage_total[\"/n8n\"]"
+    }
+  }
+}
