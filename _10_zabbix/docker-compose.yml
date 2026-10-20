@@ -1,0 +1,52 @@
+name: zabbix-lab
+
+# Phase 1 — Zabbix 감시 토대 (별도 스택, 기존 SOAR 스택 무수정)
+# 기존 서비스는 host.docker.internal:<호스트포트> 로 에이전트리스 TCP 체크(Simple check).
+
+services:
+  zabbix-postgres:
+    image: postgres:15
+    container_name: zbx-postgres
+    environment:
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix        # 랩 기본값(Zabbix 예제) — 운영 전환 시 변경
+      POSTGRES_DB: zabbix
+    volumes:
+      - zbx_pgdata:/var/lib/postgresql/data
+    networks: [zbx-net]
+    restart: unless-stopped
+
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:alpine-7.0-latest
+    container_name: zbx-server
+    environment:
+      DB_SERVER_HOST: zabbix-postgres
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+      POSTGRES_DB: zabbix
+    depends_on: [zabbix-postgres]
+    networks: [zbx-net]
+    ports: ["10051:10051"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    restart: unless-stopped
+
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest
+    container_name: zbx-web
+    environment:
+      ZBX_SERVER_HOST: zabbix-server
+      DB_SERVER_HOST: zabbix-postgres
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+      POSTGRES_DB: zabbix
+      PHP_TZ: Asia/Seoul
+    depends_on: [zabbix-server, zabbix-postgres]
+    networks: [zbx-net]
+    ports: ["8081:8080"]
+    restart: unless-stopped
+
+networks:
+  zbx-net:
+
+volumes:
+  zbx_pgdata:
