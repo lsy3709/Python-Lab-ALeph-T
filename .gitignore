@@ -1,2 +1,17 @@
 .env
 .venv/
+
+# 파이썬 캐시
+__pycache__/
+*.pyc
+
+# oh-my-claudecode 상태 파일(세션마다 바뀜)
+.omc/
+
+# Wazuh 인증서·개인키·백업·생성 설정 (공개 저장소에 올리지 않음)
+_9_Wazuh/config/
+_9_Wazuh/backup/
+_9_Wazuh/generate-indexer-certs.yml
+
+# 게시판 실습용 임시 PHP 테스트 파일
+_7_board_test/templates/*test.php
