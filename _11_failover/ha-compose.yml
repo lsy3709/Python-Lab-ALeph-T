@@ -1,0 +1,111 @@
+name: ha-lab
+
+# ★ 비밀번호(ha_root_pw/board_pw/replpw)는 격리된 랩 전용 throwaway 값 — 운영 전환 시 반드시 변경.
+# HA 2단계 — 게시판+MySQL 이중화(Active-Standby, keepalived VIP) 로컬 데모
+# 운영 스택(5000·3306)과 분리: 별도 네트워크 172.16.0.0/24, 호스트 포트 미공개(브리지 내부 VIP).
+#   board-main .11 / board-sub .12 / mysql-main .21 / mysql-sub .22 / attacker .50 / VIP .100
+
+services:
+  mysql-main:
+    image: mysql:8.0
+    container_name: ha-mysql-main
+    command: ["--server-id=1","--log-bin=mysql-bin","--binlog-format=ROW","--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ha_root_pw
+      MYSQL_DATABASE: my_new_board_db
+      MYSQL_USER: board
+      MYSQL_PASSWORD: board_pw
+    networks: { ha-net: { ipv4_address: 172.16.0.21 } }
+    restart: unless-stopped
+
+  mysql-sub:
+    image: mysql:8.0
+    container_name: ha-mysql-sub
+    command: ["--server-id=2","--log-bin=mysql-bin","--binlog-format=ROW","--relay-log=relay-bin","--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ha_root_pw
+      MYSQL_DATABASE: my_new_board_db
+      MYSQL_USER: board
+      MYSQL_PASSWORD: board_pw
+    networks: { ha-net: { ipv4_address: 172.16.0.22 } }
+    restart: unless-stopped
+
+  board-main:
+    image: ha-board:latest
+    container_name: ha-board-main
+    environment:
+      DATABASE_URL: mysql+pymysql://board:board_pw@mysql-main:3306/my_new_board_db
+      SECURITY_API_KEY: ha-lab-key
+    depends_on: [mysql-main]
+    volumes:
+      - ha_board_logs:/app/logs          # 보안로그(security.log)를 공유 볼륨에 기록 → Wazuh 사이드카가 읽음
+    networks: { ha-net: { ipv4_address: 172.16.0.11 } }
+    restart: unless-stopped
+
+  board-sub:
+    image: ha-board:latest
+    container_name: ha-board-sub
+    environment:
+      DATABASE_URL: mysql+pymysql://board:board_pw@mysql-sub:3306/my_new_board_db
+      SECURITY_API_KEY: ha-lab-key
+    depends_on: [mysql-sub]
+    volumes:
+      - ha_board_logs:/app/logs          # main 과 공유(VIP 가 넘어가도 같은 로그 스트림)
+    networks: { ha-net: { ipv4_address: 172.16.0.12 } }
+    restart: unless-stopped
+
+  keepalived-main:
+    image: ha-keepalived:latest
+    container_name: ha-keepalived-main
+    network_mode: "service:board-main"     # board-main 의 netns 공유 → VIP 가 board-main eth0 에 붙음
+    cap_add: [NET_ADMIN, NET_BROADCAST, NET_RAW]
+    volumes:
+      - ./keepalived-main.conf:/conf/keepalived.conf:ro
+    depends_on: [board-main]
+    restart: unless-stopped
+
+  keepalived-sub:
+    image: ha-keepalived:latest
+    container_name: ha-keepalived-sub
+    network_mode: "service:board-sub"
+    cap_add: [NET_ADMIN, NET_BROADCAST, NET_RAW]
+    volumes:
+      - ./keepalived-sub.conf:/conf/keepalived.conf:ro
+    depends_on: [board-sub]
+    restart: unless-stopped
+
+  attacker:
+    image: ha-attacker:latest
+    container_name: ha-attacker
+    cap_add: [NET_RAW]
+    networks: { ha-net: { ipv4_address: 172.16.0.50 } }
+    command: ["sleep", "infinity"]
+    restart: "no"
+
+  # SOAR 연동: 게시판 보안로그(security.log)를 읽어 Wazuh 매니저로 보내는 사이드카 에이전트.
+  # wazuh-manager2 는 ha-net 에 연결돼 있어 이름으로 도달. 그룹 ha-container 의 agent.conf 가 localfile 제공.
+  wazuh-agent:
+    image: ha-wazuh-agent:latest        # 커스텀 빌드(Dockerfile.wazuh-agent) — 공식 agent 이미지 없음
+    container_name: ha-wazuh-agent
+    hostname: ha-board-container
+    environment:
+      WAZUH_MANAGER: wazuh-manager2
+      WAZUH_AGENT_NAME: ha-board-container
+      WAZUH_AGENT_GROUP: ha-container
+    volumes:
+      - ha_board_logs:/app/logs:ro       # 게시판 보안로그를 읽기 전용으로 공유
+      - ha_agent_etc:/var/ossec/etc      # client.keys 등 설정 유지 → 재시작 시 재등록(중복) 방지
+    networks: { ha-net: { ipv4_address: 172.16.0.60 } }
+    depends_on: [board-main]
+    restart: unless-stopped
+
+networks:
+  ha-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.0.0/24
+
+volumes:
+  ha_board_logs:                         # board-main/sub 가 security.log 를 쓰고, wazuh-agent 가 읽는 공유 볼륨
+  ha_agent_etc:                          # wazuh-agent 설정/등록키(client.keys) 영속화

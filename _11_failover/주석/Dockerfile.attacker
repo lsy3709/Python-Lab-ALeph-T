@@ -1,0 +1,21 @@
+# ============================================================================
+# Dockerfile.attacker — 랩 안에서 공격/점검을 날리는 "공격 박스" 이미지
+# ----------------------------------------------------------------------------
+# 용도: VIP·노드로 HTTP 프로브(curl)·포트스캔(nmap)을 보내 가용성(failover) 측정 &
+#       공격 재현. 스스로 공격하지 않고, 필요할 때 docker exec 로 명령을 넣는 '상주형'.
+# 빌드: docker build -t ha-attacker:latest -f .\Dockerfile.attacker .
+# ============================================================================
+
+# FROM: 가벼운 alpine 3.20.
+FROM alpine:3.20
+
+# nmap 은 alpine 기본 저장소가 아니라 'community' 저장소에 있다.
+#   sed 로 /etc/apk/repositories 에서 community 줄의 주석(#)을 제거해 활성화한 뒤,
+#   nmap(포트스캔) + curl(HTTP 요청)을 설치. --no-cache 로 색인 캐시는 안 남김.
+#   (줄 끝 '\' 는 다음 줄로 이어지는 명령 — RUN 한 번에 실행)
+RUN sed -i 's|^#\(.*/community\)|\1|' /etc/apk/repositories \
+ && apk add --no-cache nmap curl
+
+# CMD: 'sleep infinity' = 아무 것도 안 하고 계속 떠 있기(상주).
+#   실제 공격/프로브는: docker exec ha-attacker curl ... / docker exec ha-attacker nmap ...
+CMD ["sleep", "infinity"]

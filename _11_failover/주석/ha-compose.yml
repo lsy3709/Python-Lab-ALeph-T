@@ -1,0 +1,134 @@
+# ============================================================================
+# ha-compose.yml — HA 랩의 모든 컨테이너·네트워크·볼륨을 한 파일로 정의
+# ----------------------------------------------------------------------------
+# docker compose = 여러 컨테이너를 YAML 하나로 띄우는 도구.
+#   ha_up.ps1 이 이 파일로 'docker compose -p ha-lab up -d <서비스>' 를 순서대로 실행.
+#   -p ha-lab = 프로젝트 이름(컨테이너/네트워크 접두사). services 아래 각 블록이 컨테이너 1개.
+# ============================================================================
+name: ha-lab
+
+# ★ 비밀번호(ha_root_pw/board_pw/replpw)는 격리된 랩 전용 throwaway 값 — 운영 전환 시 반드시 변경.
+# HA 2단계 — 게시판+MySQL 이중화(Active-Standby, keepalived VIP) 로컬 데모
+# 운영 스택(5000·3306)과 분리: 별도 네트워크 172.16.0.0/24, 호스트 포트 미공개(브리지 내부 VIP).
+#   board-main .11 / board-sub .12 / mysql-main .21 / mysql-sub .22 / attacker .50 / VIP .100
+
+services:
+  # ── MySQL 주(main) : 복제의 '소스(master)' ───────────────────────────────
+  mysql-main:
+    image: mysql:8.0                 # Docker Hub 공식 이미지(빌드 불필요, 자동 pull)
+    container_name: ha-mysql-main
+    # command: MySQL 서버 실행 옵션
+    #   --server-id=1 복제 참가자 고유번호(main/sub 달라야) · --log-bin binlog 켜기(복제의 원천)
+    #   --binlog-format=ROW 행 단위 복제(가장 안전) · --default-authentication-plugin=... 구형 호환 인증
+    command: ["--server-id=1","--log-bin=mysql-bin","--binlog-format=ROW","--default-authentication-plugin=mysql_native_password"]
+    environment:                     # 컨테이너 환경변수(첫 기동 시 DB·계정 자동 생성)
+      MYSQL_ROOT_PASSWORD: ha_root_pw
+      MYSQL_DATABASE: my_new_board_db
+      MYSQL_USER: board
+      MYSQL_PASSWORD: board_pw
+    networks: { ha-net: { ipv4_address: 172.16.0.21 } }   # 고정 IP 부여
+    restart: unless-stopped          # 죽으면 자동 재시작(사용자가 멈추기 전까지)
+
+  # ── MySQL 부(sub) : 복제의 '레플리카(replica)' ──────────────────────────
+  mysql-sub:
+    image: mysql:8.0
+    container_name: ha-mysql-sub
+    #   --relay-log 레플리카가 받은 변경을 임시 저장하는 로그(복제에 필요)
+    command: ["--server-id=2","--log-bin=mysql-bin","--binlog-format=ROW","--relay-log=relay-bin","--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ha_root_pw
+      MYSQL_DATABASE: my_new_board_db
+      MYSQL_USER: board
+      MYSQL_PASSWORD: board_pw
+    networks: { ha-net: { ipv4_address: 172.16.0.22 } }
+    restart: unless-stopped
+
+  # ── 게시판 주(main) ──────────────────────────────────────────────────────
+  board-main:
+    image: ha-board:latest           # Dockerfile.board 로 빌드한 이미지
+    container_name: ha-board-main
+    environment:
+      # DATABASE_URL: 이 게시판이 쓸 DB(=mysql-main). pymysql 드라이버로 접속.
+      DATABASE_URL: mysql+pymysql://board:board_pw@mysql-main:3306/my_new_board_db
+      SECURITY_API_KEY: ha-lab-key   # 보안 API 키(차단/이벤트 API 인증)
+    depends_on: [mysql-main]         # mysql-main 이 먼저 뜨도록(기동 순서 힌트)
+    volumes:
+      - ha_board_logs:/app/logs      # 보안로그(security.log)를 공유 볼륨에 기록 → Wazuh 사이드카가 읽음
+    networks: { ha-net: { ipv4_address: 172.16.0.11 } }
+    restart: unless-stopped
+
+  # ── 게시판 부(sub) ───────────────────────────────────────────────────────
+  board-sub:
+    image: ha-board:latest
+    container_name: ha-board-sub
+    environment:
+      DATABASE_URL: mysql+pymysql://board:board_pw@mysql-sub:3306/my_new_board_db
+      SECURITY_API_KEY: ha-lab-key
+    depends_on: [mysql-sub]
+    volumes:
+      - ha_board_logs:/app/logs      # main 과 "같은" 볼륨 공유 → VIP 가 넘어가도 같은 로그 스트림
+    networks: { ha-net: { ipv4_address: 172.16.0.12 } }
+    restart: unless-stopped
+
+  # ── keepalived 주(VIP 소유) ──────────────────────────────────────────────
+  keepalived-main:
+    image: ha-keepalived:latest      # Dockerfile.keepalived 로 빌드
+    container_name: ha-keepalived-main
+    # ★ network_mode: "service:board-main" = board-main 의 네트워크 네임스페이스를 공유.
+    #   → keepalived 가 올리는 VIP 가 board-main 의 eth0 에 그대로 붙는다(게시판=VIP 주인).
+    network_mode: "service:board-main"
+    cap_add: [NET_ADMIN, NET_BROADCAST, NET_RAW]   # VIP 추가·VRRP 전송에 필요한 네트워크 권한
+    volumes:
+      - ./keepalived-main.conf:/conf/keepalived.conf:ro   # 설정을 읽기전용(ro)으로 마운트(entry.sh 가 복사)
+    depends_on: [board-main]
+    restart: unless-stopped
+
+  # ── keepalived 부(대기) ──────────────────────────────────────────────────
+  keepalived-sub:
+    image: ha-keepalived:latest
+    container_name: ha-keepalived-sub
+    network_mode: "service:board-sub"
+    cap_add: [NET_ADMIN, NET_BROADCAST, NET_RAW]
+    volumes:
+      - ./keepalived-sub.conf:/conf/keepalived.conf:ro
+    depends_on: [board-sub]
+    restart: unless-stopped
+
+  # ── 공격/점검 박스 ───────────────────────────────────────────────────────
+  attacker:
+    image: ha-attacker:latest        # Dockerfile.attacker 로 빌드(nmap·curl)
+    container_name: ha-attacker
+    cap_add: [NET_RAW]               # nmap 등 raw 소켓 사용 권한
+    networks: { ha-net: { ipv4_address: 172.16.0.50 } }
+    command: ["sleep", "infinity"]   # 상주(필요 시 docker exec 로 명령 투입)
+    restart: "no"                    # 공격 박스는 자동 재시작 안 함
+
+  # ── SOAR 사이드카: 게시판 보안로그를 Wazuh 매니저로 전송 ──────────────────
+  # wazuh-manager2 는 ha-net 에 연결돼 있어 이름으로 도달. 그룹 ha-container 의 agent.conf 가 localfile 제공.
+  wazuh-agent:
+    image: ha-wazuh-agent:latest     # Dockerfile.wazuh-agent 로 빌드(공식 agent 이미지 없음)
+    container_name: ha-wazuh-agent
+    hostname: ha-board-container     # 매니저에 이 이름으로 등록됨(에이전트 008)
+    environment:
+      WAZUH_MANAGER: wazuh-manager2  # 보낼 매니저(같은 ha-net, 이름으로 접속)
+      WAZUH_AGENT_NAME: ha-board-container
+      WAZUH_AGENT_GROUP: ha-container
+    volumes:
+      - ha_board_logs:/app/logs:ro   # 게시판 보안로그를 "읽기전용" 으로 공유(에이전트는 읽기만)
+      - ha_agent_etc:/var/ossec/etc  # client.keys 등 설정 유지 → 재시작 시 재등록(중복) 방지
+    networks: { ha-net: { ipv4_address: 172.16.0.60 } }
+    depends_on: [board-main]
+    restart: unless-stopped
+
+# ── 네트워크: 이 랩 전용 격리 브리지 ──────────────────────────────────────
+networks:
+  ha-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.0.0/24      # 운영 스택과 겹치지 않는 별도 대역
+
+# ── 볼륨: 컨테이너가 지워져도 남는 데이터 저장소 ──────────────────────────
+volumes:
+  ha_board_logs:                     # board-main/sub 가 security.log 를 쓰고, wazuh-agent 가 읽는 공유 볼륨
+  ha_agent_etc:                      # wazuh-agent 설정/등록키(client.keys) 영속화

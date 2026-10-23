@@ -1,0 +1,31 @@
+# ============================================================================
+# Dockerfile.keepalived — VIP(가상 IP)를 옮겨주는 "keepalived(VRRP)" 이미지
+# ----------------------------------------------------------------------------
+# keepalived 란? 두 노드가 VRRP 로 "누가 살아있나" 를 주고받으며, 살아있는 쪽이
+#   공유 IP(VIP)를 가져가는 프로그램. main 이 죽으면 sub 가 VIP 를 넘겨받음(=failover).
+# 이 이미지는 board 컨테이너의 네트워크(netns)를 공유해서, VIP 를 board 의 eth0 에 붙인다.
+# 빌드: docker build -t ha-keepalived:latest -f .\Dockerfile.keepalived .
+#   맨 끝 '.' = 빌드 컨텍스트(현재 폴더). 여기선 COPY 가 없어 컨텍스트 파일은 안 씀.
+# ============================================================================
+
+# FROM: 아주 가벼운 리눅스 alpine 3.20 을 바탕으로.
+FROM alpine:3.20
+
+# RUN apk add: alpine 패키지 설치. keepalived(본체) + curl(아래 health check 용).
+#   --no-cache = 패키지 색인 캐시를 안 남겨 이미지 작게. mkdir 로 설정 폴더 미리 생성.
+RUN apk add --no-cache keepalived curl && mkdir -p /etc/keepalived
+
+# /check.sh (health check): 2초 안에 로컬 게시판(127.0.0.1:5000)이 응답하면 성공(exit 0).
+#   -f 실패 시 에러코드 · -s 조용히 · -m 2 최대 2초 · -o /dev/null 본문 버림.
+#   아래 keepalived.conf 의 vrrp_script 가 이 결과로 "이 노드 게시판이 살았나" 판정.
+RUN printf '#!/bin/sh\ncurl -fs -m 2 -o /dev/null http://127.0.0.1:5000/\n' > /check.sh && chmod 755 /check.sh
+
+# /entry.sh (컨테이너 시작 스크립트): 3가지를 한다 —
+#  (1) 마운트된 /conf/keepalived.conf 를 /etc/keepalived 로 복사+권한 644.
+#      → Windows 바인드마운트 파일을 keepalived 가 "권한이 이상하다"며 거부하는 문제를 피함.
+#  (2) 남아있는 stale PID 파일 삭제. → 재시작 때 'daemon is already running' 교착 방지.
+#  (3) keepalived 를 포그라운드로 실행: -n(데몬화 안 함, 컨테이너 PID1 유지) -l(콘솔 로그) -f(설정파일).
+RUN printf '#!/bin/sh\nmkdir -p /etc/keepalived\ncp /conf/keepalived.conf /etc/keepalived/keepalived.conf\nchmod 644 /etc/keepalived/keepalived.conf\nrm -f /run/keepalived.pid /var/run/keepalived.pid /run/keepalived*.pid 2>/dev/null\nexec keepalived -n -l -f /etc/keepalived/keepalived.conf\n' > /entry.sh && chmod 755 /entry.sh
+
+# CMD: 컨테이너가 뜨면 위 entry.sh 실행.
+CMD ["/entry.sh"]

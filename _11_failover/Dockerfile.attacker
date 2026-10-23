@@ -1,0 +1,8 @@
+# 공격/점검 박스 — 랩 안에서 VIP·노드로 요청을 보내 가용성(failover) 측정·공격 재현에 쓴다.
+#   (nmap=포트스캔, curl=HTTP 프로브/반복 로그인). HA 네트워크(172.16.0.50)에 상주.
+FROM alpine:3.20
+# nmap 은 alpine 'community' 저장소에 있어 주석 해제 후 설치(nmap+curl)
+RUN sed -i 's|^#\(.*/community\)|\1|' /etc/apk/repositories \
+ && apk add --no-cache nmap curl
+# 상주형: 필요할 때 docker exec 로 공격/프로브 명령을 넣는다(스스로 공격하지 않음)
+CMD ["sleep", "infinity"]

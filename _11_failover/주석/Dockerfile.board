@@ -1,0 +1,39 @@
+# ============================================================================
+# Dockerfile.board — HA 데모용 "게시판(Flask)" 이미지 만들기
+# ----------------------------------------------------------------------------
+# Dockerfile 이란? "이미지를 어떻게 구울지" 적은 설명서. 한 줄 한 줄이 명령.
+# 빌드: docker build -t ha-board:latest -f .\Dockerfile.board <게시판원본폴더>
+#   -t ha-board:latest = 결과 이미지 이름(태그) · -f = 이 Dockerfile 사용 ·
+#   맨 끝 <폴더> = "빌드 컨텍스트"(COPY 가 가져올 파일들이 있는 기준 폴더)
+# ============================================================================
+
+# FROM: 바탕이 되는 베이스 이미지. python:3.12-slim = 파이썬 3.12 가 깔린 가벼운(slim) 리눅스.
+FROM python:3.12-slim
+
+# WORKDIR: 컨테이너 안 작업 폴더를 /app 으로. 이후 COPY·RUN·CMD 가 이 폴더 기준.
+WORKDIR /app
+
+# COPY <빌드컨텍스트의 파일> <컨테이너 경로>: 의존성 목록부터 복사.
+#   requirements.txt 만 먼저 복사하는 이유 = 소스가 바뀌어도 의존성이 그대로면
+#   아래 pip 설치 '레이어'가 캐시돼 재빌드가 빨라진다(도커 레이어 캐시 활용).
+COPY requirements.txt ./
+
+# RUN: 빌드 중에 실행할 명령. pip 로 라이브러리 설치.
+#   --no-cache-dir = pip 캐시를 안 남겨 이미지 용량을 줄임.
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 앱 소스에서 "런타임에 꼭 필요한 것만" 복사(테스트·문서 등은 제외해 이미지 작게).
+COPY app.py config.py extensions.py ./
+COPY controllers ./controllers    # 라우트/비즈니스 로직
+COPY models ./models              # DB 모델(SQLAlchemy)
+COPY templates ./templates        # HTML 템플릿
+
+# EXPOSE: 이 컨테이너가 5000 포트를 쓴다는 "문서화"(실제 개방은 compose 의 ports/네트워크가 함).
+EXPOSE 5000
+
+# ※ DB 접속 정보는 이미지에 박지 않고, 실행 시 환경변수 DATABASE_URL 로 주입한다
+#    (compose 에서 board-main 은 mysql-main, board-sub 는 mysql-sub 를 가리킴 → 노드별 DB).
+
+# CMD: 컨테이너가 떴을 때 기본으로 실행할 명령(= 게시판 서버 시작).
+#   Flask 앱 app.py 가 0.0.0.0:5000 으로 뜨도록 작성돼 있음.
+CMD ["python", "app.py"]

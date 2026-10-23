@@ -1,0 +1,16 @@
+# HA 게시판(컨테이너) 보안로그를 읽어 Wazuh 매니저로 보내는 사이드카 에이전트.
+# Wazuh 는 공식 "agent" 도커 이미지를 배포하지 않으므로 직접 빌드한다(ubuntu + apt 설치).
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y curl gnupg apt-transport-https && \
+    curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | \
+      gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && \
+    chmod 644 /usr/share/keyrings/wazuh.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" \
+      > /etc/apt/sources.list.d/wazuh.list && \
+    apt-get update && \
+    WAZUH_MANAGER="placeholder" apt-get install -y wazuh-agent=4.9.0-1 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY wazuh-agent-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

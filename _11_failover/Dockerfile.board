@@ -1,0 +1,13 @@
+# HA 데모용 게시판 이미지 (기존 _7_board_test Flask 앱 컨테이너화)
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+# 앱 소스(런타임에 필요한 것만)
+COPY app.py config.py extensions.py ./
+COPY controllers ./controllers
+COPY models ./models
+COPY templates ./templates
+EXPOSE 5000
+# DB 접속은 DATABASE_URL 환경변수로 주입(노드별 MySQL)
+CMD ["python", "app.py"]

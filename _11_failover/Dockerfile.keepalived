@@ -1,0 +1,12 @@
+# keepalived(VRRP) 이미지 — board 컨테이너의 netns 를 공유해 VIP 를 board eth0 에 붙인다.
+#   health check(/check.sh)가 실패하면 priority 가 떨어져 상대 노드로 VIP 가 넘어간다(failover).
+FROM alpine:3.20
+# keepalived 본체 + health check 용 curl
+RUN apk add --no-cache keepalived curl && mkdir -p /etc/keepalived
+# /check.sh : 2초 안에 로컬 게시판(127.0.0.1:5000)이 응답하면 성공(0), 아니면 실패 → vrrp_script 가 이걸로 노드 생존 판정
+RUN printf '#!/bin/sh\ncurl -fs -m 2 -o /dev/null http://127.0.0.1:5000/\n' > /check.sh && chmod 755 /check.sh
+# /entry.sh : (1)마운트된 conf 를 복사·권한설정 → Windows 바인드마운트 config 를 keepalived 가 거부하는 문제 회피
+#            (2)재시작 시 남은 stale PID 제거 → 'daemon is already running' 교착 방지
+#            (3)keepalived 포그라운드 실행(-n: no-daemon, -l: 콘솔로그)
+RUN printf '#!/bin/sh\nmkdir -p /etc/keepalived\ncp /conf/keepalived.conf /etc/keepalived/keepalived.conf\nchmod 644 /etc/keepalived/keepalived.conf\nrm -f /run/keepalived.pid /var/run/keepalived.pid /run/keepalived*.pid 2>/dev/null\nexec keepalived -n -l -f /etc/keepalived/keepalived.conf\n' > /entry.sh && chmod 755 /entry.sh
+CMD ["/entry.sh"]

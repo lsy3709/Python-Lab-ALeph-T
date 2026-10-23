@@ -1,0 +1,39 @@
+# ============================================================================
+# Dockerfile.wazuh-agent — 게시판 보안로그를 Wazuh 매니저로 보내는 "사이드카 에이전트"
+# ----------------------------------------------------------------------------
+# 왜 직접 빌드? Wazuh 는 공식 "agent" 도커 이미지를 배포하지 않는다 → ubuntu 에 apt 로 설치.
+# 사이드카란? 본체(게시판) 옆에 붙어 보조 역할(여기선 로그 수집·전송)을 하는 컨테이너.
+# 빌드: docker build -t ha-wazuh-agent:latest -f .\Dockerfile.wazuh-agent .
+#   (COPY 로 entrypoint 를 가져오므로 빌드 컨텍스트 '.' 에 wazuh-agent-entrypoint.sh 가 있어야 함)
+# ============================================================================
+
+# FROM: ubuntu 22.04(Wazuh apt 패키지가 제공되는 안정 배포판).
+FROM ubuntu:22.04
+
+# ENV: 설치 중 apt 가 대화형 질문(지역/시간대 등)을 안 하도록(noninteractive).
+ENV DEBIAN_FRONTEND=noninteractive
+
+# RUN(한 덩어리): Wazuh 저장소를 추가하고 에이전트를 설치한다.
+#  1) 필수 도구(curl·gnupg·apt-transport-https) 설치
+#  2) Wazuh GPG 키를 받아 keyring 에 등록(패키지 서명 검증용) + 권한 644
+#  3) Wazuh apt 저장소(4.x stable)를 sources.list 에 추가
+#  4) wazuh-agent 를 "버전 고정(=4.9.0-1)" 으로 설치 — 매니저와 버전을 맞춰야 안정.
+#     WAZUH_MANAGER="placeholder" = 설치 시엔 임시값, 실제 매니저 주소는 아래 entrypoint 가 주입.
+#  5) apt 캐시/목록 삭제로 이미지 용량 축소.
+RUN apt-get update && apt-get install -y curl gnupg apt-transport-https && \
+    curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | \
+      gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && \
+    chmod 644 /usr/share/keyrings/wazuh.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" \
+      > /etc/apt/sources.list.d/wazuh.list && \
+    apt-get update && \
+    WAZUH_MANAGER="placeholder" apt-get install -y wazuh-agent=4.9.0-1 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# COPY: 기동 스크립트를 이미지 안으로. (이 스크립트가 매니저 주소/이름/그룹을 ossec.conf 에 반영하고
+#       에이전트를 등록·시작한다 — 환경변수 WAZUH_MANAGER / WAZUH_AGENT_NAME / WAZUH_AGENT_GROUP 사용)
+COPY wazuh-agent-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# ENTRYPOINT: 컨테이너의 "진입점"(항상 먼저 실행). CMD 와 달리 compose command 로 덮이지 않음.
+ENTRYPOINT ["/entrypoint.sh"]
