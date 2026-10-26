@@ -158,6 +158,40 @@ class MySQLStore:
             self._conn.rollback()
             raise
 
+    # ── 행위 이상탐지 ─────────────────────────────────────
+    def fetch_events_between(self, start: datetime, end: datetime) -> list[EventRow]:
+        """[start, end) 의 이벤트 — 이상탐지가 만든 behavior 는 빼고(다시 세지 않게)."""
+        with self._conn.cursor() as cur:
+            cur.execute(f"SELECT {EVENT_COLUMNS} FROM events_norm e WHERE e.ts >= %s AND e.ts < %s "
+                        "AND e.layer <> 'behavior' ORDER BY e.ts, e.id", (_naive_utc(start), _naive_utc(end)))
+            return [event_from_row(r) for r in cur.fetchall()]
+
+    def save_baselines(self, baselines: dict, now: datetime) -> None:
+        """기준선 테이블을 통째로 교체한다(한 트랜잭션) — 학습 구간에서 사라진 엔티티는 지워진다.
+        mean·std 열에는 robust 중심(중앙값·원형 평균)과 척도(1.4826·MAD 또는 원형 표준편차)를 넣는다."""
+        rows = [(etype, entity[:128], name, b.center, b.scale, b.n, _naive_utc(now))
+                for (etype, entity, name), b in baselines.items()]
+        self._conn.begin()
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute("DELETE FROM baselines")
+                if rows:
+                    cur.executemany("INSERT INTO baselines (entity_type, entity, feature, mean, std, n, updated_at) "
+                                    "VALUES (%s, %s, %s, %s, %s, %s, %s)", rows)
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+
+    def insert_anomaly_score(self, score) -> None:
+        feats = {name: {"value": round(f.value, 3), "z": round(f.z, 2), "kind": f.kind,
+                        "center": round(f.center, 3), "scale": round(f.scale, 3)} for name, f in score.z.items()}
+        a = score.agg
+        with self._conn.cursor() as cur:
+            cur.execute("INSERT INTO anomaly_scores (entity_type, entity, ts, score, features) VALUES (%s, %s, %s, %s, %s)",
+                        (a.entity_type, a.entity[:128], _naive_utc(a.last_ts), round(score.max_z, 3),
+                         json.dumps(feats, ensure_ascii=False)))
+
     def close_stale(self, before: datetime) -> int:
         """마지막 이벤트가 before 보다 이른 열린 인시던트를 닫는다."""
         with self._conn.cursor() as cur:
