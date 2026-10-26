@@ -18,6 +18,7 @@
 | P0 | 골격·`.env` 차단·비밀 스캔·설정 로더·`mini_xdr` 스키마 | ✅ 완료 |
 | P1 | 수집·정규화(Graylog Search API, 체크포인트) | ✅ 완료 — 30일 백필 81,258건·실시간 2.1초 |
 | P2 | 상관(인시던트)·읽기 전용 콘솔·컨테이너화 | ✅ 완료 — 81,260건 → 인시던트 1,630개(고유 지문 164종)·약 4초 |
+| P2+ | 웹 콘솔 AI 키 교체·연결 테스트(`/settings`) | ✅ 완료 — 실제 Gemini 키로 목록 46개·샘플 호출 21/3 토큰 |
 | P3 | 행위 이상탐지(기준선·z-score) | 예정 |
 | P4 | LLM 트리아지·호출 깔때기(토큰 절약)·캐싱·가드레일 | 예정 |
 | P5 | n8n 승인 대응 | 예정 |
@@ -39,7 +40,11 @@ _13_mini-xdr/
 │   ├── timeline.py      # 타임라인 접기(콘솔·LLM 카드 공용)
 │   ├── store.py         # MySQL 저장소(적재·체크포인트·상관 저장 트랜잭션, UTC)
 │   ├── worker.py        # 분석 워커(python -m app.worker [--once]) — 재연결→수집→상관
-│   └── console/         # 읽기 전용 콘솔(python -m app.console) — Flask + waitress
+│   ├── secret_box.py    # 웹 UI 저장 키 암호화(Fernet)·마스킹
+│   ├── llm_settings.py  # AI 설정 계산 — 웹 UI 저장값 > .env
+│   ├── llm_probe.py     # AI 연결 테스트(모델 목록 → 샘플 호출)
+│   ├── settings_store.py# app_settings 저장소·연결 테스트 사용 기록
+│   └── console/         # 콘솔(python -m app.console) — 사건 조회는 읽기 전용, /settings 는 AI 설정
 ├── sql/001_schema.sql   # mini_xdr DB 와 10개 테이블(여러 번 적용해도 안전)
 ├── Dockerfile · docker-compose.yml · .dockerignore   # 워커·콘솔 컨테이너
 ├── fixtures/            # 실데이터 구조로 만든 표본(TEST-NET IP·테스트 계정만)
@@ -126,6 +131,27 @@ python -m app.console          # http://127.0.0.1:8099 — 인시던트 목록(�
 - DB 세션을 `transaction_read_only` 로 열어 쓰기가 불가능합니다(DELETE → 오류 1792).
 - 로그 값(계정명 등)은 공격자가 넣을 수 있는 문자열이라 자동 이스케이프로만 출력, CSP `default-src 'none'`.
 - `/healthz` — `{"ok":true,"events":…,"incidents":…,"open":…,"backlog":…}` (DB 오류 시 503, 내용 비노출)
+
+## AI 키 교체·연결 테스트 — 웹 콘솔 `/settings` (P2+)
+
+1. `.env` 에 암호화 열쇠를 한 번 만들어 둡니다(값은 남에게 보이지 않게):
+   ```powershell
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   # 출력값을 .env 의 SETTINGS_SECRET_KEY= 뒤에 붙여 넣고 콘솔을 다시 시작
+   ```
+2. http://127.0.0.1:8099/settings → 공급자(gemini·claude·none)·API 키 입력 → **저장**
+3. **테스트**(체크 안 함) = 모델 목록 조회(토큰 0) → 목록에서 모델 ID 를 골라 저장
+4. **샘플 호출까지** 체크 후 테스트 = 짧은 문장 1회 → 응답·입력/출력 토큰·지연 표시, `llm_calls` 에 `connection_test` 로 기록
+5. **지우고 .env 로 되돌리기** = 웹 UI 저장값 삭제
+
+| 보안 장치 | 내용 |
+|---|---|
+| 암호문 저장 | 키는 `app_settings` 에 `enc:v1:`(Fernet)로만, 열쇠는 `.env` 의 `SETTINGS_SECRET_KEY` |
+| 화면 비노출 | 키는 다시 표시하지 않음(앞4…뒤4), 입력란 `type=password`, 오류 문구에서 키 가림 |
+| 쓰기 보호 | CSRF 토큰(SameSite=Strict) · Origin 검사 · 모든 요청 Host 가 localhost 계열만(DNS 리바인딩 방지) |
+| 우선순위 | 웹 UI 저장값 > `.env`·환경변수. 저장 키를 못 풀면 `.env` 로 조용히 넘어가지 않고 문제 표시 |
+
+라이브 실측(2026-10-26): 가짜 키 → `HTTP 400: API key not valid`(키 원문 화면·DB 노출 0), 실제 Gemini 키(환경변수) → 모델 46개, `gemini-2.5-flash-lite` 는 목록에 있지만 호출 404(신규 사용자 미제공), `gemini-3.5-flash-lite` 샘플 호출 성공(응답 "연결 확인", 21/3 토큰, 1.2초).
 
 ## 컨테이너로 실행 (P2)
 
