@@ -5,8 +5,10 @@ import pytest
 
 from app.config import Settings
 from app.correlator import CorrelateResult
+from app.detector import AnomalyDetector, DetectConfig
 from app.graylog import GraylogClient
-from app.worker import build_client, collect_config, correlate_summary, cycle, run_cycle, summary_line
+from app.worker import (build_client, collect_config, correlate_summary, cycle, detect_config, run_cycle,
+                        summary_line)
 from tests.test_collector import CFG, FakeGraylog, FakeStore, msg
 
 NOW = datetime(2026, 10, 26, 6, 0, 0, tzinfo=timezone.utc)
@@ -38,6 +40,15 @@ class CycleStore(FakeStore):
 
     def close_stale(self, before):
         return 2
+
+    def fetch_events_between(self, start, end):
+        return []
+
+    def save_baselines(self, baselines, now):
+        self.baselines_saved = len(baselines)
+
+    def insert_anomaly_score(self, score):
+        raise AssertionError("이상이 없으면 기록하지 않아야 한다")
 
 
 @pytest.fixture(autouse=True)
@@ -73,6 +84,19 @@ def test_cycle_survives_db_error_without_raising():
 def test_cycle_marks_collect_error_as_failed_but_still_correlates():
     lines, failed = cycle(FakeGraylog([], fail=True), CycleStore(), CFG, W, NOW)
     assert failed and "오류" in lines[0] and lines[1].startswith("[상관]")
+
+
+def test_cycle_runs_anomaly_between_collect_and_correlate():
+    det = AnomalyDetector(DetectConfig())
+    lines, failed = cycle(FakeGraylog([]), CycleStore(), CFG, W, NOW, detector=det)
+    assert not failed and [line.split(" ")[0] for line in lines] == ["[수집]", "[이상]", "[상관]"]
+    assert det.built_for is not None
+
+
+def test_detect_config_from_settings():
+    cfg = detect_config(Settings(_env_file=None, baseline_days=14, baseline_min_samples=20, anomaly_z=4.0))
+    assert (cfg.baseline_days, cfg.min_samples, cfg.threshold) == (14, 20, 4.0)
+    assert detect_config(Settings(_env_file=None)) == DetectConfig(30, 30, 3.0)
 
 
 def test_correlate_summary():

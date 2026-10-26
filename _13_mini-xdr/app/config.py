@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     collect_max_pages: int = Field(50, ge=1)
     correlation_window_min: int = Field(10, ge=1)
 
+    # 행위 이상탐지 — 기준선 학습 기간·최소 표본·z 임계
+    baseline_days: int = Field(30, ge=1)
+    baseline_min_samples: int = Field(30, ge=5)
+    anomaly_z: float = Field(3.0, gt=0)
+
     # 저장소
     mysql_host: str = "localhost"
     mysql_port: int = 3306
