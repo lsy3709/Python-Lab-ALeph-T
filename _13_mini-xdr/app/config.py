@@ -34,7 +34,14 @@ class Settings(BaseSettings):
     # 수집·상관
     graylog_url: str = "http://localhost:9000"
     graylog_token: SecretStr | None = None
+    graylog_user: str | None = None
+    graylog_password: SecretStr | None = None
+    graylog_query: str = "_exists_:wazuh_rule_id OR _exists_:rule"
     poll_interval_sec: int = Field(30, ge=5)
+    collect_page_size: int = Field(500, ge=10, le=1000)
+    collect_backfill_min: int = Field(1440, ge=1)
+    collect_overlap_sec: int = Field(60, ge=0)
+    collect_max_pages: int = Field(50, ge=1)
     correlation_window_min: int = Field(10, ge=1)
 
     # 저장소
@@ -64,3 +71,11 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return self.llm_disabled_reason is None
+
+    def graylog_credentials(self) -> tuple[str | None, str | None, str | None]:
+        """(토큰, 계정, 비밀번호) — 토큰이 있으면 토큰만. 자리표시자는 없는 것으로 본다."""
+        if _has(self.graylog_token):
+            return self.graylog_token.get_secret_value(), None, None
+        if self.graylog_user and _has(self.graylog_password):
+            return None, self.graylog_user, self.graylog_password.get_secret_value()
+        return None, None, None

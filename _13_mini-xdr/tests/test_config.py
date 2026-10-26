@@ -81,6 +81,25 @@ def test_reads_environment_variables(monkeypatch):
     assert s.llm_provider == "none" and s.poll_interval_sec == 60
 
 
+def test_collect_defaults():
+    s = make()
+    assert s.graylog_query == "_exists_:wazuh_rule_id OR _exists_:rule"
+    assert (s.collect_page_size, s.collect_backfill_min, s.collect_overlap_sec, s.collect_max_pages) == (500, 1440, 60, 50)
+
+
+def test_graylog_credentials_prefer_token_and_ignore_placeholders():
+    assert make().graylog_credentials() == (None, None, None)
+    assert make(graylog_token="<YOUR_GRAYLOG_TOKEN>").graylog_credentials() == (None, None, None)
+    assert make(graylog_token="t" * 40, graylog_user="u", graylog_password="p").graylog_credentials() == ("t" * 40, None, None)
+    assert make(graylog_user="u", graylog_password="p").graylog_credentials() == (None, "u", "p")
+    assert make(graylog_user="u", graylog_password="<YOUR_GRAYLOG_PASSWORD>").graylog_credentials() == (None, None, None)
+
+
+def test_collect_page_size_bounds():
+    with pytest.raises(ValidationError):
+        make(collect_page_size=5000)
+
+
 def test_env_example_loads_in_rules_mode():
     s = Settings(_env_file=EXAMPLE)
     assert s.llm_provider == "claude"
