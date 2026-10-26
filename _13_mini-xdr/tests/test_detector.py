@@ -87,4 +87,5 @@ def test_report_scans_whole_window_without_writing():
     store = FakeStore(history() + burst())
     rep = report(store, NOW, CFG)
     assert rep["buckets"] == 41 and rep["flagged"]["events"] == 1 and rep["top"][0]["entity"] == "203.0.113.50"
+    assert rep["bands"] == {"z8": 1}  # 이상 버킷을 최대 z 구간으로 — 임계를 정하는 근거
     assert store.scores == [] and store.saved == []

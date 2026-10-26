@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
-from app.anomaly import POPULATION, Score, anomaly_events, bucket_start, bucketize, build_baselines, score_bucket
+from app.anomaly import (POPULATION, Score, anomaly_events, band, bucket_start, bucketize, build_baselines,
+                         score_bucket)
 from app.correlator import EventRow
 from app.normalizer import NormalizedEvent
 
@@ -94,6 +95,7 @@ def report(store: DetectorStore, now: datetime, cfg: DetectConfig, top: int = 10
         "buckets": len(scores),
         "flagged_buckets": sum(1 for s in scores if s.anomalies),
         "flagged": dict(flagged),
+        "bands": dict(Counter(band(s.max_z) for s in scores if s.anomalies)),
         "population": {f"{k[0]}:{k[2]}": (round(b.center, 2), round(b.scale, 2), b.n)
                        for k, b in sorted(usable.items()) if k[1] == POPULATION},
         "individual": sorted({f"{k[0]}:{k[1]}" for k in usable if k[1] != POPULATION}),
@@ -117,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         store.close()
     print(f"버킷 {rep['buckets']} · 이상 버킷 {rep['flagged_buckets']} · 특징별 {rep['flagged']}")
+    print(f"이상 버킷의 최대 z 구간: {rep['bands']}  (z3=3~5 · z5=5~8 · z8=8 이상)")
     print("집단 기준선(중심, 척도, 표본):")
     for name, value in rep["population"].items():
         print(f"  {name:<16} {value}")
