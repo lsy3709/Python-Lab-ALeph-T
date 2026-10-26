@@ -1,0 +1,8 @@
+# 비밀 파일 — 공개 저장소에 절대 올리지 않음
+.env
+.env.*
+!.env.example
+
+# 로컬 실행 산출물
+.pytest_cache/
+__pycache__/
