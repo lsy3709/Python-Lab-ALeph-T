@@ -29,13 +29,18 @@
   select, button { background:var(--panel); color:var(--text); border:1px solid var(--line); padding:4px 8px; border-radius:4px; }
   .scroll { overflow-x:auto; }
   .note { background:#1d2a38; border-left:3px solid var(--accent); padding:8px 12px; margin:12px 0; }
+  .note.good { border-left-color:#2ecc71; } .note.bad { border-left-color:#e74c3c; }
+  form.panel { display:flex; gap:12px; align-items:center; flex-wrap:wrap; background:var(--panel); border:1px solid var(--line); padding:10px 12px; border-radius:6px; }
+  input { background:#0f1419; color:var(--text); border:1px solid var(--line); padding:4px 8px; border-radius:4px; }
+  nav a { margin-right:14px; }
   code { color:#9fd3ff; }
 </style>
 </head>
 <body>
 <header>
   <h1><a href="/">mini-xdr 콘솔</a></h1>
-  <span class="muted">읽기 전용 · 시각은 KST · 개념 학습·대체 실습(SKT 사전 싱크 필요)</span>
+  <nav><a href="/">인시던트</a>{% if settings_enabled %}<a href="/settings">AI 설정</a>{% endif %}</nav>
+  <span class="muted">사건 조회는 읽기 전용 · 시각은 KST · 개념 학습·대체 실습(SKT 사전 싱크 필요)</span>
 </header>
 <main>{% block content %}{% endblock %}</main>
 </body>
