@@ -95,6 +95,13 @@ def test_graylog_credentials_prefer_token_and_ignore_placeholders():
     assert make(graylog_user="u", graylog_password="<YOUR_GRAYLOG_PASSWORD>").graylog_credentials() == (None, None, None)
 
 
+def test_console_defaults_bind_localhost_only():
+    s = make()
+    assert (s.console_host, s.console_port) == ("127.0.0.1", 8099)
+    with pytest.raises(ValidationError):
+        make(console_port=70000)
+
+
 def test_collect_page_size_bounds():
     with pytest.raises(ValidationError):
         make(collect_page_size=5000)

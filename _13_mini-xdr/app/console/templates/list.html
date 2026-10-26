@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stats">
+  <div class="stat"><span class="muted">이벤트</span><b>{{ stats.events|num }}</b></div>
+  <div class="stat"><span class="muted">인시던트</span><b>{{ stats.incidents|num }}</b></div>
+  <div class="stat"><span class="muted">열림</span><b>{{ stats.open_incidents|num }}</b></div>
+  <div class="stat"><span class="muted">다계층</span><b>{{ stats.multi_layer|num }}</b></div>
+  <div class="stat"><span class="muted">상관 대기</span><b>{{ stats.backlog|num }}</b></div>
+</div>
+<form class="filters" method="get" action="/">
+  <label>상태
+    <select name="status">
+      {% for s in statuses %}<option value="{{ s }}"{% if s == status %} selected{% endif %}>{{ {"all": "전체", "open": "열림", "closed": "닫힘"}[s] }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>우선순위
+    <select name="priority">
+      <option value="">전체</option>
+      {% for p in priorities %}<option value="{{ p }}"{% if p == priority %} selected{% endif %}>{{ p }}</option>{% endfor %}
+    </select>
+  </label>
+  <label><input type="checkbox" name="multi" value="1"{% if multi %} checked{% endif %}> 다계층만</label>
+  <button type="submit">적용</button>
+  <span class="muted">{{ total|num }}건 · {{ page }}/{{ pages }}쪽</span>
+</form>
+<div class="scroll"><table>
+  <tr><th>ID</th><th>우선순위</th><th>엔티티</th><th>계층</th><th>이벤트</th><th>최고 level</th><th>시작 ~ 마지막 (KST)</th><th>상태</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="/incidents/{{ r.id }}">#{{ r.id }}</a></td>
+    <td><span class="badge p-{{ r.current_priority }}">{{ r.current_priority }}</span><span class="muted">하한 {{ r.rule_floor }}</span></td>
+    <td>{{ r.entity_key }}</td>
+    <td>{% for l in r.layers %}<span class="badge l-{{ l }}">{{ l }}</span>{% endfor %}</td>
+    <td>{{ r.event_count|num }}</td>
+    <td>{{ r.max_level if r.max_level is not none else "-" }}</td>
+    <td>{{ r.opened_at|kst }} ~ {{ r.last_event_at|kst }}</td>
+    <td>{{ "열림" if r.status == "open" else "닫힘" }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="8" class="muted">인시던트가 없습니다 — 워커가 상관을 돌렸는지 확인하세요.</td></tr>
+  {% endfor %}
+</table></div>
+{% set qs = "status=" ~ status ~ "&priority=" ~ priority ~ ("&multi=1" if multi else "") %}
+<p>
+  {% if page > 1 %}<a href="/?{{ qs }}&page={{ page - 1 }}">← 이전</a>{% endif %}
+  {% if page < pages %}<a href="/?{{ qs }}&page={{ page + 1 }}">다음 →</a>{% endif %}
+</p>
+{% endblock %}

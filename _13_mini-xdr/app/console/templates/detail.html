@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}인시던트 #{{ inc.id }} — mini-xdr{% endblock %}
+{% block content %}
+<p><a href="/">← 목록</a></p>
+<h2>인시던트 #{{ inc.id }} <span class="badge p-{{ inc.current_priority }}">{{ inc.current_priority }}</span></h2>
+<div class="stats">
+  <div class="stat"><span class="muted">엔티티</span><b>{{ inc.entity_key }}</b></div>
+  <div class="stat"><span class="muted">계층</span><b>{% for l in inc.layers %}<span class="badge l-{{ l }}">{{ l }}</span>{% endfor %}</b></div>
+  <div class="stat"><span class="muted">이벤트</span><b>{{ inc.event_count|num }}</b></div>
+  <div class="stat"><span class="muted">규칙 하한</span><b>{{ inc.rule_floor }}</b></div>
+  <div class="stat"><span class="muted">기간 (KST)</span><b>{{ inc.opened_at|kst }} ~ {{ inc.last_event_at|kst }}</b></div>
+  <div class="stat"><span class="muted">상태</span><b>{{ "열림" if inc.status == "open" else "닫힘" }}</b></div>
+</div>
+<p class="muted">관련 계정: {{ users|join(", ") if users else "없음" }} · 지문 <code>{{ (inc.fingerprint or "")[:12] }}</code></p>
+<div class="note">AI 판정: 아직 없음 — P4(LLM 트리아지)에서 연결됩니다. 지금 우선순위는 규칙 하한 기준입니다.</div>
+
+<h3>신호 요약</h3>
+<div class="scroll"><table>
+  <tr><th>계층</th><th>출처</th><th>신호</th><th>건수</th><th>최고 level</th><th>MITRE</th><th>처음 ~ 마지막 (KST)</th></tr>
+  {% for s in summary %}
+  <tr>
+    <td><span class="badge l-{{ s.layer }}">{{ s.layer }}</span></td>
+    <td>{{ s.source }}</td>
+    <td>{{ s.sig }}</td>
+    <td>{{ s.n|num }}</td>
+    <td>{{ s.max_level if s.max_level is not none else "-" }}</td>
+    <td>{{ s.mitre or "-" }}</td>
+    <td>{{ s.first|kst }} ~ {{ s.last|kst }}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+
+<h3>타임라인 <span class="muted">(이어지는 같은 신호는 한 줄로 접음)</span></h3>
+{% if truncated %}<div class="note">이벤트가 많아 앞부분만 보여 줍니다(최대 {{ fetch_limit|num }}건 · {{ item_limit }}줄).</div>{% endif %}
+<div class="scroll"><table>
+  <tr><th>경과</th><th>계층</th><th>출처</th><th>신호</th><th>횟수</th><th>계정</th><th>시각 (KST)</th></tr>
+  {% for t in timeline %}
+  <tr>
+    <td>{{ offset_label((t.first - start).total_seconds()) }}</td>
+    <td><span class="badge l-{{ t.layer }}">{{ t.layer }}</span></td>
+    <td>{{ t.source }}</td>
+    <td>{{ t.signal }}{% if t.mitre %} <span class="muted">{{ t.mitre }}</span>{% endif %}</td>
+    <td>{{ t.count }}</td>
+    <td>{{ t.users|join(", ") }}</td>
+    <td>{{ t.first|kst }}{% if t.count > 1 %} ~ {{ t.last|kst }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

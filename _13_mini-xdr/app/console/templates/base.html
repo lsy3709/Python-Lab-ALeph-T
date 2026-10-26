@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}mini-xdr 콘솔{% endblock %}</title>
+<style>
+  :root { --bg:#0f1419; --panel:#161d26; --line:#263241; --text:#d8e0ea; --muted:#8b98a8; --accent:#4ea1ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Malgun Gothic","Segoe UI",sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { padding:12px 20px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  main { padding:16px 20px; }
+  a { color:var(--accent); text-decoration:none; }
+  h2 { font-size:18px; } h3 { font-size:15px; margin-top:22px; }
+  table { width:100%; border-collapse:collapse; background:var(--panel); }
+  th, td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  .badge { display:inline-block; padding:1px 7px; border-radius:9px; font-size:12px; margin-right:3px; }
+  .p-P1 { background:#c0392b; color:#fff; } .p-P2 { background:#e67e22; color:#111; }
+  .p-P3 { background:#f1c40f; color:#111; } .p-P4 { background:#3d4b5c; color:#ddd; }
+  .l-app { background:#1f4e79; } .l-host { background:#3e5a2b; } .l-network { background:#5b2c6f; }
+  .l-data { background:#7a4b16; } .l-behavior { background:#7b1f3a; }
+  .muted { color:var(--muted); font-size:12px; }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .stat { background:var(--panel); border:1px solid var(--line); padding:8px 12px; border-radius:6px; }
+  .stat b { display:block; font-size:17px; margin-top:2px; }
+  form.filters { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  select, button { background:var(--panel); color:var(--text); border:1px solid var(--line); padding:4px 8px; border-radius:4px; }
+  .scroll { overflow-x:auto; }
+  .note { background:#1d2a38; border-left:3px solid var(--accent); padding:8px 12px; margin:12px 0; }
+  code { color:#9fd3ff; }
+</style>
+</head>
+<body>
+<header>
+  <h1><a href="/">mini-xdr 콘솔</a></h1>
+  <span class="muted">읽기 전용 · 시각은 KST · 개념 학습·대체 실습(SKT 사전 싱크 필요)</span>
+</header>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

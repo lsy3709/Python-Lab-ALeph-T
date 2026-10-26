@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # 대응
     n8n_webhook_url: str | None = None
 
+    # 콘솔(읽기 전용 웹) — 기본은 이 PC 에서만 접속
+    console_host: str = "127.0.0.1"
+    console_port: int = Field(8099, ge=1, le=65535)
+
     @property
     def llm_disabled_reason(self) -> str | None:
         """LLM 을 쓸 수 없는 이유. 쓸 수 있으면 None."""
