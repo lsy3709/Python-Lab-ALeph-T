@@ -37,3 +37,13 @@ def schema_applied(mysql_container):
         r = run_mysql(mysql_container["name"], input_sql=sql)
         assert r.returncode == 0, f"{attempt}회차 적용 실패: {r.stderr}"
     return mysql_container
+
+
+@pytest.fixture
+def fresh_db(schema_applied):
+    """같은 스키마를 새 이름의 DB 에 적용해 돌려준다 — 테스트끼리 인시던트·진행 위치가 섞이지 않게."""
+    name = f"mxt_{uuid.uuid4().hex[:10]}"
+    sql = SCHEMA_PATH.read_text(encoding="utf-8").replace("mini_xdr", name)
+    r = run_mysql(schema_applied["name"], input_sql=sql)
+    assert r.returncode == 0, r.stderr
+    return {"name": name, "port": schema_applied["port"]}
