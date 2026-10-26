@@ -71,6 +71,14 @@ def test_resumes_from_checkpoint_minus_overlap_and_dedupes():
     assert (r.fetched, r.inserted, r.duplicates) == (2, 1, 1)
 
 
+def test_catch_up_from_old_checkpoint_skips_overlap():
+    # 며칠 전 체크포인트(따라잡기 중)는 이미 색인이 끝난 구간이라 overlap 재조회가 필요 없다
+    cp = NOW - timedelta(days=2)
+    g = FakeGraylog([])
+    collect_once(g, FakeStore(checkpoint=cp), CFG, NOW, source=SRC)
+    assert g.calls[0][0] == cp
+
+
 def test_pages_through_more_than_page_size():
     base = NOW - timedelta(minutes=5)
     g = FakeGraylog([msg(i, base + timedelta(seconds=i)) for i in range(7)])

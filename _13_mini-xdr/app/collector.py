@@ -37,6 +37,7 @@ class CollectConfig:
     backfill: timedelta = timedelta(minutes=1440)
     max_pages: int = 50
     lag: timedelta = timedelta(seconds=2)
+    recent: timedelta = timedelta(minutes=10)  # 체크포인트가 이보다 최근일 때만 overlap 재조회
 
 
 @dataclass
@@ -58,7 +59,12 @@ def _msg_ts(msg: dict) -> datetime:
 def collect_once(client: Searcher, store: EventStore, cfg: CollectConfig, now: datetime,
                  *, source: str = "graylog") -> CollectResult:
     checkpoint = store.get_checkpoint(source)
-    start = (checkpoint - cfg.overlap) if checkpoint else (now - cfg.backfill)
+    if checkpoint is None:
+        start = now - cfg.backfill
+    elif now - checkpoint <= cfg.recent:
+        start = checkpoint - cfg.overlap  # 실시간 구간: 늦게 색인된 메시지를 다시 훑는다
+    else:
+        start = checkpoint  # 따라잡기 중: 오래전 구간은 색인이 끝났으니 overlap 불필요(중복 재조회 절감)
     end = now - cfg.lag
     result = CollectResult(window_from=start, window_to=end)
     cursor, offset, last_seen = start, 0, None
