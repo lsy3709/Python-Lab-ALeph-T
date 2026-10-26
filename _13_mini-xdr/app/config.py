@@ -54,9 +54,15 @@ class Settings(BaseSettings):
     # 대응
     n8n_webhook_url: str | None = None
 
-    # 콘솔(읽기 전용 웹) — 기본은 이 PC 에서만 접속
+    # 콘솔(웹) — 기본은 이 PC 에서만 접속
     console_host: str = "127.0.0.1"
     console_port: int = Field(8099, ge=1, le=65535)
+    # 웹 UI 에서 저장하는 AI 키를 암호화하는 열쇠(Fernet). 없으면 웹 UI 키 저장이 막힌다.
+    settings_secret_key: SecretStr | None = None
+
+    def secret_key_value(self) -> str | None:
+        """자리표시자가 아닌 열쇠 값 — 없으면 None."""
+        return self.settings_secret_key.get_secret_value().strip() if _has(self.settings_secret_key) else None
 
     @property
     def llm_disabled_reason(self) -> str | None:
