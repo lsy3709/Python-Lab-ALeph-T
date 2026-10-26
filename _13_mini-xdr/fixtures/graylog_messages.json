@@ -23,6 +23,10 @@
     "rule": "pfsense-block", "src_ip": "192.168.120.1", "dst_ip": "192.168.120.255", "dst_port": 137},
   "suricata_ids": {"gl2_message_id": "01M5TESTSURIFWD000000001", "timestamp": "2026-10-18T05:00:00.000Z", "source": "suricata",
     "rule": "ids-alert", "src_ip": "172.31.195.249"},
+  "snort_portscan": {"gl2_message_id": "01M5TESTSNORT000000000001", "timestamp": "2026-10-15T07:24:28.695Z", "source": "snort-kali",
+    "rule": "snort-portscan", "sensor": "snort", "sid": 1000011, "src_ip": "203.0.113.44"},
+  "cloudflare_waf": {"gl2_message_id": "01M5TESTCFWAF000000000001", "timestamp": "2026-09-30T11:18:52.987Z", "source": "cloudflare-edge",
+    "rule": "cf-waf", "edge": "cf", "cf_action": "challenge", "waf_rule": "ratelimit", "src_ip": "198.51.100.23", "uri": "/login"},
   "plain_syslog": {"gl2_message_id": "01M5TESTPLAIN00000000001", "timestamp": "2026-10-18T05:00:01.000Z", "source": "somehost",
     "message": "ordinary log line without security fields"}
 }

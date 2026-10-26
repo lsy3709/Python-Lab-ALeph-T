@@ -53,6 +53,17 @@ def test_pfsense_and_suricata_are_network():
     assert (s.source, s.layer, s.event_type, s.asset) == ("suricata", "network", "ids-alert", "suricata")
 
 
+@pytest.mark.parametrize("key, source, event_type, asset", [
+    ("snort_portscan", "snort", "snort-portscan", "snort-kali"),
+    ("cloudflare_waf", "cloudflare", "cf-waf", "cloudflare-edge"),
+])
+def test_gelf_network_and_edge_sensors_are_network_not_board(key, source, event_type, asset):
+    # 라이브 백필에서 발견: GELF rule 로 들어오는 Snort·Cloudflare 신호가 board/app 으로 잘못 분류됐었다
+    e = normalize(FIX[key])
+    assert (e.source, e.layer, e.event_type, e.asset) == (source, "network", event_type, asset)
+    assert e.src_ip == FIX[key]["src_ip"]
+
+
 def test_message_without_security_fields_is_skipped():
     assert normalize(FIX["plain_syslog"]) is None
 

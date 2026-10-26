@@ -12,6 +12,19 @@ from typing import Any
 
 APP_GROUPS = {"webapp", "flask_board", "web_scan"}
 
+# GELF rule 로 들어오는 네트워크·엣지 센서 신호: rule → source 이름
+NETWORK_SIGNALS = {
+    "pfsense-block": "pfsense",
+    "ids-alert": "suricata",
+    "snort-portscan": "snort",
+    "cf-waf": "cloudflare",
+}
+# rule 없이 출처(source)만으로 알 수 있는 네트워크 센서: source → (source 이름, 기본 event_type)
+NETWORK_ORIGINS = {
+    "pfSense": ("pfsense", "pfsense-block"),
+    "suricata": ("suricata", "ids-alert"),
+}
+
 
 @dataclass(frozen=True)
 class NormalizedEvent:
@@ -84,12 +97,17 @@ def normalize(msg: dict[str, Any]) -> NormalizedEvent | None:
 
     rule = msg.get("rule")
     origin = msg.get("source")
-    if rule == "pfsense-block" or origin == "pfSense":
-        return NormalizedEvent(ts=ts, layer="network", source="pfsense", event_type="pfsense-block",
-                               raw_ref=raw_ref, src_ip=_cut(msg.get("src_ip"), 45), asset="pfSense")
-    if rule == "ids-alert" or origin == "suricata":
-        return NormalizedEvent(ts=ts, layer="network", source="suricata", event_type="ids-alert",
-                               raw_ref=raw_ref, src_ip=_cut(msg.get("src_ip"), 45), asset="suricata")
+    if rule in NETWORK_SIGNALS:
+        net_source, net_type = NETWORK_SIGNALS[rule], rule
+    elif origin in NETWORK_ORIGINS:
+        net_source, default_type = NETWORK_ORIGINS[origin]
+        net_type = rule or default_type
+    else:
+        net_source = net_type = None
+    if net_source:
+        return NormalizedEvent(ts=ts, layer="network", source=net_source, event_type=_cut(net_type, 64),
+                               raw_ref=raw_ref, src_ip=_cut(msg.get("src_ip"), 45),
+                               asset=_cut(origin, 128) or net_source)
     if rule:
         return NormalizedEvent(
             ts=ts, layer="app", source="board", event_type=_cut(rule, 64), raw_ref=raw_ref,
