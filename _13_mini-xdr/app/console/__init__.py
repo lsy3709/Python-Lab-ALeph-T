@@ -53,7 +53,9 @@ def create_app(open_queries, settings_deps: settings_views.SettingsDeps | None =
     def security_headers(resp):
         resp.headers["Content-Security-Policy"] = CSP
         resp.headers["X-Content-Type-Options"] = "nosniff"
-        resp.headers["Referrer-Policy"] = "no-referrer"
+        # no-referrer 로 두면 브라우저가 POST 의 Origin 을 "null" 로 보내 설정 저장이 막힌다(Fetch 표준, 실측)
+        # → same-origin: 같은 출처에만 리퍼러를 보내고 외부 사이트로는 보내지 않는다.
+        resp.headers["Referrer-Policy"] = "same-origin"
         return resp
 
     @app.get("/")

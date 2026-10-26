@@ -84,6 +84,12 @@ def test_foreign_host_header_is_rejected():  # DNS 리바인딩 방지
     assert h.client.get("/settings", headers={"Host": "127.0.0.1:8099"}).status_code == 200
 
 
+def test_referrer_policy_keeps_same_origin_post_origin_header():
+    # 회귀: no-referrer 면 브라우저가 같은 출처 POST 의 Origin 을 "null" 로 보내 저장이 403 이 됐다(라이브 실측)
+    h = Harness()
+    assert h.client.get("/settings").headers["Referrer-Policy"] == "same-origin"
+
+
 def test_host_and_origin_edge_cases():
     from app.console.security import host_allowed, origin_allowed
     assert all(host_allowed(h) for h in ("127.0.0.1:8099", "localhost", "LOCALHOST:8099", "[::1]:8099"))
@@ -100,6 +106,18 @@ def test_save_then_page_shows_mask_never_the_key():
     assert h.repo.rows["gemini_api_key"][0].startswith("enc:v1:")
     html = h.client.get("/settings?msg=saved").get_data(as_text=True)
     assert FAKE not in html and "AIza…9z8y" in html and "웹 UI 저장" in html and "저장했습니다" in html
+
+
+def test_switching_provider_does_not_carry_old_providers_model():
+    # 회귀(라이브 실측): 모델 칸에 이전 공급자(claude) 기본값이 채워진 채 gemini 로 저장되면
+    # gemini_model=claude-haiku-5-5 가 되고 상태가 '사용 가능'으로 잘못 보였다.
+    h = Harness()
+    t = h.token()
+    h.post("/settings/llm", {"csrf": t, "provider": "gemini", "model": "claude-haiku-5-5", "api_key": FAKE})
+    assert "gemini_model" not in h.repo.rows
+    assert "gemini 모델 없음" in h.client.get("/settings").get_data(as_text=True)
+    h.post("/settings/llm", {"csrf": t, "provider": "gemini", "model": "gem-flash", "api_key": ""})
+    assert h.repo.rows["gemini_model"][0] == "gem-flash"  # 같은 공급자에서 직접 고친 모델은 저장
 
 
 def test_invalid_input_shows_error_without_echoing_key():

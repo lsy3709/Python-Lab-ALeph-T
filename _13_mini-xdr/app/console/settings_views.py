@@ -64,9 +64,12 @@ def register(app: Flask, deps: SettingsDeps) -> None:
         guard()
         with deps.open_conn() as conn:
             repo = deps.repo_factory(conn)
+            current = effective_llm_config(deps.env, repo, deps.box)
+            provider, model = request.form.get("provider", ""), request.form.get("model", "").strip()
+            if provider != current.provider and model == (current.model or ""):
+                model = ""  # 공급자를 바꾸며 이전 공급자의 모델 ID 가 그대로 넘어오면 저장하지 않는다
             try:
-                save_llm(repo, deps.box, provider=request.form.get("provider", ""),
-                         model=request.form.get("model", ""), api_key=request.form.get("api_key", ""))
+                save_llm(repo, deps.box, provider=provider, model=model, api_key=request.form.get("api_key", ""))
             except ValueError as exc:  # 입력값(특히 키)은 되돌려 보여 주지 않는다
                 return page(effective_llm_config(deps.env, repo, deps.box), status=400, error=str(exc))
         return redirect("/settings?msg=saved", code=303)
