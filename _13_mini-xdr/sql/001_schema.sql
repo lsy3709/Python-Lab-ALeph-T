@@ -149,3 +149,12 @@ CREATE TABLE IF NOT EXISTS actions (
   KEY ix_actions_incident (incident_id),
   CONSTRAINT fk_actions_incident FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- 11) 앱 설정 — 웹 콘솔(/settings)에서 바꾸는 값. .env 보다 우선한다.
+--     AI 키는 Fernet 암호문(enc:v1:…)으로만 저장하고, 복호화 열쇠(SETTINGS_SECRET_KEY)는 .env 에만 둔다.
+CREATE TABLE IF NOT EXISTS app_settings (
+  name       VARCHAR(64)  PRIMARY KEY,            -- llm_provider, gemini_model, gemini_api_key ...
+  value      TEXT         NOT NULL,
+  is_secret  BOOLEAN      NOT NULL DEFAULT FALSE,  -- TRUE 면 value 는 암호문
+  updated_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB;

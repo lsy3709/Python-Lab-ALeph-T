@@ -14,4 +14,5 @@ TABLES = (
     "llm_calls",
     "checkpoints",
     "actions",
+    "app_settings",
 )
