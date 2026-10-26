@@ -15,3 +15,6 @@ _9_Wazuh/generate-indexer-certs.yml
 
 # 게시판 실습용 임시 PHP 테스트 파일
 _7_board_test/templates/*test.php
+
+# k8s 실습 컨테이너 이미지 export(대용량 바이너리)
+_12_k8s/hab.tar

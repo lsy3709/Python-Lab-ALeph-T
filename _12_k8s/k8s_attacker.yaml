@@ -1,0 +1,13 @@
+# Kali 공격 파드 — 추가 풀 없이 board:local(python 포함) 재사용. 기본 ServiceAccount(권한 없음).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kali-attacker
+  namespace: ha
+  labels: { app: kali }
+spec:
+  containers:
+    - name: kali
+      image: ha-board:latest
+      imagePullPolicy: IfNotPresent
+      command: ["sleep", "infinity"]

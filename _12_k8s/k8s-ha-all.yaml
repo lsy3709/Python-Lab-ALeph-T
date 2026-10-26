@@ -1,0 +1,166 @@
+# HA 3단계 — 게시판+MySQL 자가치유(self-healing) 구성 (네임스페이스 ha)
+# 121/122편 매니페스트 재사용 + 2단계 함정 반영(MySQL native auth) + 노드 분산/NodePort
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ha
+---
+# ConfigMap = 비밀 아닌 설정(DB 호스트·DB명·환경)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: board-config
+  namespace: ha
+data:
+  DB_HOST: mysql
+  DB_NAME: my_new_board_db
+  APP_ENV: production
+---
+# Secret = 랩 전용 placeholder 비밀번호(격리 랩 throwaway)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: ha
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "lab_only_root_pw"
+  MYSQL_USER: board
+  MYSQL_PASSWORD: "lab_only_board_pw"
+---
+# MySQL = 상태 있는 앱 → StatefulSet + PVC + headless Service(안정 DNS mysql-0.mysql)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: ha
+  labels: { app: mysql }
+spec:
+  clusterIP: None
+  selector: { app: mysql }
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: ha
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels: { app: mysql }
+  template:
+    metadata:
+      labels: { app: mysql }
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          # ★ 2단계 함정: MySQL8 기본 caching_sha2 → pymysql 인증 실패. native 로 고정.
+          args: ["--default-authentication-plugin=mysql_native_password"]
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_ROOT_PASSWORD } }
+            - name: MYSQL_DATABASE
+              valueFrom: { configMapKeyRef: { name: board-config, key: DB_NAME } }
+            - name: MYSQL_USER
+              valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_USER } }
+            - name: MYSQL_PASSWORD
+              valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_PASSWORD } }
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec: { command: ["sh","-c","mysqladmin ping -h127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD"] }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: { storage: 1Gi }
+---
+# 게시판 = 상태 없는 앱 → Deployment(replicas=2) + 프로브 + 리소스 + 노드 분산
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board
+  namespace: ha
+  labels: { app: board }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: board }
+  template:
+    metadata:
+      labels: { app: board }
+    spec:
+      # ★ 2 복제본을 서로 다른 노드에 분산 → 노드 1대 다운돼도 다른 노드에 살아 있음
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels: { app: board }
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: board
+          image: ha-board:latest
+          imagePullPolicy: IfNotPresent     # kind 에 적재한 로컬 이미지 사용(Hub 조회 안 함)
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_USER
+              valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_PASSWORD } }
+            - name: DATABASE_URL
+              value: "mysql+pymysql://$(DB_USER):$(DB_PASSWORD)@mysql:3306/my_new_board_db"
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+          startupProbe:                      # 느린 최초 기동/DB대기 보호
+            httpGet: { path: /, port: 5000 }
+            failureThreshold: 60
+            periodSeconds: 2
+          readinessProbe:                    # 준비 안 되면 Service 에서 제외
+            httpGet: { path: /, port: 5000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:                     # 죽으면 컨테이너 재시작
+            httpGet: { path: /, port: 5000 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+# board ClusterIP(내부) + NodePort(외부 프로브용 30080)
+apiVersion: v1
+kind: Service
+metadata:
+  name: board
+  namespace: ha
+spec:
+  selector: { app: board }
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-np
+  namespace: ha
+spec:
+  type: NodePort
+  selector: { app: board }
+  ports:
+    - port: 80
+      targetPort: 5000
+      nodePort: 30080

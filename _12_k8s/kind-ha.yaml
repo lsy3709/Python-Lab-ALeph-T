@@ -1,0 +1,13 @@
+# kind 멀티노드 클러스터 — HA 3단계(자가치유) 데모용
+# control-plane 1 + worker 2 → 파드/노드 재스케줄 실측 가능
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ha-k8s
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080   # board NodePort
+        hostPort: 30080
+        protocol: TCP
+  - role: worker
+  - role: worker
