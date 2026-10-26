@@ -1,0 +1,34 @@
+# mini-xdr 워커·콘솔
+# - 기존 SOAR 컨테이너(mysql-server·gl-graylog)의 네트워크에는 붙지 않는다.
+#   호스트에 공개된 포트(3306·9000)로 host.docker.internal 을 거쳐 접속한다.
+# - 비밀값은 .env 에서만 읽는다(이 파일에는 쓰지 않는다). 아래 environment 는 접속 주소만 바꾼다.
+# - 수업 때 명시적으로 켜고 끈다(restart: "no").
+#   켜기: docker compose up -d --build   끄기: docker compose down
+name: mini-xdr
+
+services:
+  worker:
+    build: .
+    image: mini-xdr:p2
+    command: ["python", "-m", "app.worker"]
+    env_file: .env
+    environment:
+      MYSQL_HOST: host.docker.internal
+      GRAYLOG_URL: http://host.docker.internal:9000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"
+
+  console:
+    build: .
+    image: mini-xdr:p2
+    command: ["python", "-m", "app.console"]
+    env_file: .env
+    environment:
+      MYSQL_HOST: host.docker.internal
+      CONSOLE_HOST: 0.0.0.0        # 컨테이너 안에서는 모든 주소로 듣고,
+    ports:
+      - "127.0.0.1:8099:8099"      # 호스트에서는 이 PC(127.0.0.1)에만 공개
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"

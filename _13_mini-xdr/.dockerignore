@@ -1,0 +1,10 @@
+# 이미지에 들어가면 안 되는 것 — 비밀값은 실행 때 env_file 로만 받는다
+.env
+.env.*
+.venv/
+.git/
+.pytest_cache/
+__pycache__/
+tests/
+docs/
+fixtures/
