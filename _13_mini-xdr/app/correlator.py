@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Protocol
 
 from app.fingerprint import fingerprint, signal_of
 
 PRIORITIES = ("P1", "P2", "P3", "P4")  # 앞쪽일수록 급함
+CURSOR_SOURCE = "correlator"           # checkpoints 의 진행 위치 이름(last_id = events_norm.id)
 
 
 @dataclass(frozen=True)
@@ -121,3 +123,43 @@ def correlate(events: list[EventRow], latest: dict[str, IncidentState], window: 
         inc.status = "open" if inc.last_event_at >= now - window else "closed"
         inc.current_priority = higher(inc.current_priority, inc.rule_floor)
     return CorrelationBatch(list(touched.values()), links, created)
+
+
+class CorrelationStore(Protocol):
+    def get_cursor(self, source: str) -> int: ...
+    def fetch_events_after(self, last_id: int, limit: int) -> list[EventRow]: ...
+    def load_latest_incidents(self, keys: set[str]) -> dict[str, IncidentState]: ...
+    def save_correlation(self, batch: CorrelationBatch, source: str, last: EventRow) -> None: ...
+    def close_stale(self, before: datetime) -> int: ...
+
+
+@dataclass
+class CorrelateResult:
+    processed: int = 0
+    created: int = 0
+    updated: int = 0   # 기존 인시던트에 이어 붙인 횟수(묶음마다 셈)
+    closed: int = 0
+    batches: int = 0
+
+
+def correlate_once(store: CorrelationStore, window: timedelta, now: datetime, *, batch_size: int = 5000,
+                   max_batches: int = 40) -> CorrelateResult:
+    """진행 위치(events_norm.id) 뒤의 이벤트를 묶음 단위로 상관하고, 조용해진 인시던트를 닫는다."""
+    r = CorrelateResult()
+    cursor = store.get_cursor(CURSOR_SOURCE)
+    while r.batches < max_batches:
+        events = store.fetch_events_after(cursor, batch_size)
+        if not events:
+            break
+        batch = correlate(events, store.load_latest_incidents({entity_key(e) for e in events}), window, now)
+        last = max(events, key=lambda e: e.id)
+        store.save_correlation(batch, CURSOR_SOURCE, last)
+        cursor = last.id
+        r.processed += len(events)
+        r.created += batch.created
+        r.updated += len(batch.touched) - batch.created
+        r.batches += 1
+        if len(events) < batch_size:
+            break
+    r.closed = store.close_stale(now - window)
+    return r
