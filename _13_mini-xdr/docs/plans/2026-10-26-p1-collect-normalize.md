@@ -936,6 +936,13 @@ if __name__ == "__main__":
 - [ ] **Step 5: 재실행 멱등** — 같은 창을 다시 수집해도 `적재 0 · 중복 N`.
 - [ ] **Step 6: README·진행 상태 갱신 후 커밋·푸시**
 
+## 구현 중 변경 (라이브 실측으로 바뀐 것)
+
+1. **네트워크 신호 표** — 30일 백필에서 `snort-portscan`(출처 `snort-kali`)·`cf-waf`(출처 `cloudflare-edge`)가 board/app 으로 잘못 분류됨을 발견 → `NETWORK_SIGNALS`·`NETWORK_ORIGINS` 표로 일반화(snort·cloudflare 추가, asset 은 실제 출처). 커밋 `7d2311d`.
+2. **따라잡기 중 overlap 생략** — 체크포인트가 10분(`CollectConfig.recent`)보다 오래됐으면 overlap 없이 체크포인트부터. 같은 30일 백필의 중복 재조회 11,846 → 647건(94.5% 감소). 커밋 `bbc6b9b`.
+3. **체크포인트 업서트 문법** — `VALUES(col)`(MySQL 8.0.20 부터 폐지 예고) 대신 행 별칭 `AS new`. mysql:8.0·mysql:latest(26.7) 모두 통합 통과.
+4. 수집 루프는 `while…else` 대신 루프 앞에서 최대 페이지를 검사하는 형태로 정리(동작 동일).
+
 ## 자체 점검 (계획 ↔ 설계 [186])
 
 - ①collector → Task 2·3, ②normalizer → Task 1, ⑧store(이벤트·체크포인트) → Task 4, 워커 → Task 5, 라이브 → Task 6 ✅

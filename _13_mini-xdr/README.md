@@ -16,22 +16,28 @@
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | P0 | 골격·`.env` 차단·비밀 스캔·설정 로더·`mini_xdr` 스키마 | ✅ 완료 |
-| P1 | 수집·정규화(Graylog Search API, 체크포인트) | 예정 |
+| P1 | 수집·정규화(Graylog Search API, 체크포인트) | ✅ 완료 — 30일 백필 81,258건·실시간 2.1초 |
 | P2 | 상관(인시던트)·콘솔 목록 | 예정 |
 | P3 | 행위 이상탐지(기준선·z-score) | 예정 |
 | P4 | LLM 트리아지·호출 깔때기(토큰 절약)·캐싱·가드레일 | 예정 |
 | P5 | n8n 승인 대응 | 예정 |
 | P6 | 레드팀 "AI 속이기"·최적화 전후 측정 | 예정 |
 
-## 폴더 구조 (P0 시점)
+## 폴더 구조 (P1 시점)
 
 ```text
 _13_mini-xdr/
 ├── app/
 │   ├── config.py        # 환경설정 로더 — 키 없으면 규칙 판정 모드
 │   ├── secret_scan.py   # 공개 저장소용 비밀 스캔(python -m app.secret_scan)
-│   └── schema.py        # 스키마 경로·테이블 목록
+│   ├── schema.py        # 스키마 경로·테이블 목록
+│   ├── normalizer.py    # Graylog 메시지 → 공통 스키마(출처·계층 분류)
+│   ├── graylog.py       # Graylog 검색 API 클라이언트(토큰/계정 인증)
+│   ├── collector.py     # 수집 한 주기(체크포인트·overlap·페이지·정체 방지)
+│   ├── store.py         # MySQL 저장소(INSERT IGNORE·체크포인트, UTC)
+│   └── worker.py        # 수집 워커(python -m app.worker [--once])
 ├── sql/001_schema.sql   # mini_xdr DB 와 10개 테이블(여러 번 적용해도 안전)
+├── fixtures/            # 실데이터 구조로 만든 표본(TEST-NET IP·테스트 계정만)
 ├── tests/               # pytest (integration 은 도커 필요)
 ├── docs/plans/          # 단계별 구현 계획
 ├── .env.example         # 설정 키 예시(자리표시자만)
@@ -72,6 +78,25 @@ mini-xdr 전용 최소 권한 계정(비밀번호는 직접 정하고 `.env` 의
 CREATE USER IF NOT EXISTS 'xdr'@'%' IDENTIFIED BY '<비밀번호>';
 GRANT SELECT, INSERT, UPDATE, DELETE ON mini_xdr.* TO 'xdr'@'%';
 ```
+
+## 수집 워커 실행 (P1)
+
+`.env` 에 Graylog 인증(`GRAYLOG_TOKEN` 권장, 없으면 `GRAYLOG_USER`/`GRAYLOG_PASSWORD`)과 `xdr` 계정 비밀번호를 넣은 뒤:
+
+```powershell
+python -m app.worker --once   # 한 주기만 — 체크포인트가 없으면 COLLECT_BACKFILL_MIN 만큼 과거부터
+python -m app.worker          # 상시 실행(POLL_INTERVAL_SEC 마다) — Ctrl+C 로 종료
+```
+
+출력 예: `[수집] 10-26 06:31:43~06:32:44Z 페이지 1 · 조회 1 · 적재 1 · 중복 0 · 건너뜀 0`
+
+| 출처(source) | 계층(layer) | 판별 |
+|---|---|---|
+| wazuh | 룰 그룹으로 결정: `ids`→network · `mysql_audit`→data · `webapp`/`flask_board`/`web_scan`→app · 그 외 host | `wazuh_rule_id` 있음 |
+| pfsense · suricata · snort · cloudflare | network | GELF `rule`(pfsense-block·ids-alert·snort-portscan·cf-waf) 또는 출처 |
+| board | app | 그 밖의 GELF `rule`(게시판 신호·봇) |
+
+라이브 실측(2026-10-26): 30일 백필 4주기 81,258건(25,000건당 약 3.2초), 따라잡기 중 overlap 생략으로 중복 재조회 11,846→647건, 표식 신호 적재까지 2.1초, 재실행 시 `적재 0 · 중복 N`(멱등).
 
 ## 보안 수칙 (이 저장소는 공개입니다)
 
