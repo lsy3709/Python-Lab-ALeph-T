@@ -44,6 +44,29 @@ def test_detail_queries(queries):
     assert (s["events"], s["incidents"], s["multi_layer"], s["backlog"]) == (5, 4, 1, 0)
 
 
+def test_anomaly_queries(fresh_db):
+    from app.anomaly import build_baselines, bucketize, score_bucket
+    from tests.test_store_anomaly_mysql import history
+    kw = dict(host="127.0.0.1", port=fresh_db["port"], user="root", password=ROOT_PW, database=fresh_db["name"])
+    store = MySQLStore(**kw)
+    events = history(store)
+    bl = build_baselines(bucketize(events).values())
+    store.save_baselines(bl, events[0].ts)
+    agg = next(iter(bucketize([e for e in events if e.src_ip == "198.51.100.0"]).values()))
+    store.insert_anomaly_score(score_bucket(agg, bl, min_samples=30, threshold=3.0))
+    store.close()
+    conn = connect_readonly(**kw)
+    try:
+        q = ConsoleQueries(conn)
+        rows = q.list_anomalies()
+        assert rows[0]["entity"] == "198.51.100.0" and rows[0]["features"]["events"]["kind"] == "population"
+        summary = q.baseline_summary(min_samples=30)
+        assert any(p["feature"] == "events" and p["n"] == 40 for p in summary["population"])
+        assert summary["individual"] == [] and summary["insufficient"] > 0   # IP 마다 표본 1개 → 개인 기준선 없음
+    finally:
+        conn.close()
+
+
 def test_readonly_session_rejects_writes(queries):
     with pytest.raises(pymysql.err.MySQLError) as exc:
         with queries._conn.cursor() as cur:

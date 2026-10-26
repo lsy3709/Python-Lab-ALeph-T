@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}행위 이상 — mini-xdr{% endblock %}
+{% block content %}
+<h2>행위 이상탐지 <span class="muted">robust z = (값 − 중앙값) / max(1.4826·MAD, 하한) · LLM 미사용</span></h2>
+
+<h3>기준선</h3>
+<p class="muted">개인 기준선 {{ summary.individual|length }}개 엔티티 · 기준선 부족 {{ summary.insufficient|num }}개 엔티티(→ 같은 유형 전체의 집단 기준선으로 채점)</p>
+<div class="scroll"><table>
+  <tr><th>집단 기준선</th><th>특징</th><th>중심</th><th>척도</th><th>표본</th><th>갱신 (KST)</th></tr>
+  {% for p in summary.population %}
+  <tr>
+    <td>{{ p.entity_type }}:{{ p.feature }}</td>
+    <td>{{ labels.get(p.feature, p.feature) }}</td>
+    <td>{{ "%.2f"|format(p.mean) }}</td>
+    <td>{{ "%.2f"|format(p.std) }}</td>
+    <td>{{ p.n|num }}</td>
+    <td>{{ p.updated_at|kst }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="muted">기준선이 아직 없습니다 — 워커가 한 번 돌면 만들어집니다.</td></tr>
+  {% endfor %}
+</table></div>
+{% if summary.individual %}
+<p>개인 기준선: {% for i in summary.individual %}<span class="badge l-behavior">{{ i.entity_type }}:{{ i.entity }}</span>{% endfor %}</p>
+{% endif %}
+
+<h3>최근 이상 <span class="muted">(최대 100건 · behavior 이벤트로 상관기에 들어가 인시던트에 붙음)</span></h3>
+<div class="scroll"><table>
+  <tr><th>시각 (KST)</th><th>엔티티</th><th>최대 z</th><th>이상 특징(값 · z · 기준선)</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.ts|kst }}</td>
+    <td>{{ r.entity_type }}:{{ r.entity }}</td>
+    <td>{{ "%.1f"|format(r.score) }}</td>
+    <td>{% for name, f in r.shown %}<span class="badge l-behavior">{{ labels.get(name, name) }}</span>{{ f.value }} (z {{ "%.1f"|format(f.z) }}, {{ "개인" if f.kind == "individual" else "집단" }} 중심 {{ f.center }}){% if not loop.last %} · {% endif %}{% endfor %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">아직 이상이 없습니다.</td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

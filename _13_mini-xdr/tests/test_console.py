@@ -51,6 +51,18 @@ class FakeQueries:
     def users(self, iid):
         return self.user_list
 
+    def list_anomalies(self, limit=100):
+        return self.anomalies
+
+    def baseline_summary(self, min_samples=30):
+        return {"population": [{"entity_type": "ip", "feature": "events", "mean": 18.0, "std": 17.79, "n": 380,
+                                "updated_at": T0}],
+                "individual": [{"entity_type": "ip", "entity": "192.168.120.1", "features": 4}], "insufficient": 7}
+
+    anomalies = [{"id": 1, "entity_type": "ip", "entity": "203.0.113.50", "ts": T0, "score": 126.8,
+                  "features": {"events": {"value": 200, "z": 126.8, "kind": "population", "center": 12, "scale": 1.48},
+                               "signals": {"value": 1, "z": 0.0, "kind": "population", "center": 1, "scale": 1.0}}}]
+
 
 @pytest.fixture
 def fake():
@@ -100,6 +112,21 @@ def test_log_values_are_escaped(fake):
     for path in ("/", "/incidents/1"):
         html = client_for(fake).get(path).get_data(as_text=True)
         assert XSS not in html and "&lt;script&gt;" in html
+
+
+def test_anomalies_page_shows_baselines_and_recent_scores(fake):
+    html = client_for(fake).get("/anomalies").get_data(as_text=True)
+    assert "ip:events" in html and "17.79" in html and "380" in html          # 집단 기준선
+    assert "192.168.120.1" in html and "기준선 부족" in html                    # 개인 기준선·부족 수
+    assert "203.0.113.50" in html and "126.8" in html and "집단" in html       # 최근 이상
+    assert "z 0.0" not in html                                                  # 임계 미만 특징은 숨김
+    assert 'href="/anomalies"' in client_for(fake).get("/").get_data(as_text=True)
+
+
+def test_anomalies_page_escapes_entity(fake):
+    fake.anomalies = [dict(FakeQueries.anomalies[0], entity_type="user", entity=XSS)]
+    html = client_for(fake).get("/anomalies").get_data(as_text=True)
+    assert XSS not in html and "&lt;script&gt;" in html
 
 
 def test_security_headers(fake):

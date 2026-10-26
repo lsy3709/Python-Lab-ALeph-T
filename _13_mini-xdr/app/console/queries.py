@@ -81,6 +81,24 @@ class ConsoleQueries:
                            "LIMIT %s", (iid, limit))
         return [r["u"] for r in rows]
 
+    def list_anomalies(self, limit: int = 100) -> list[dict]:
+        rows = self._dicts("SELECT id, entity_type, entity, ts, score, features FROM anomaly_scores "
+                           "ORDER BY ts DESC, id DESC LIMIT %s", (limit,))
+        for r in rows:
+            r["features"] = json.loads(r["features"])
+        return rows
+
+    def baseline_summary(self, min_samples: int = 30) -> dict:
+        population = self._dicts("SELECT entity_type, feature, mean, std, n, updated_at FROM baselines "
+                                 "WHERE entity = '*' ORDER BY entity_type, feature")
+        individual = self._dicts("SELECT entity_type, entity, COUNT(*) AS features FROM baselines "
+                                 "WHERE entity <> '*' AND n >= %s GROUP BY entity_type, entity "
+                                 "ORDER BY entity_type, entity", (min_samples,))
+        insufficient = self._dicts("SELECT COUNT(*) AS n FROM (SELECT entity_type, entity FROM baselines "
+                                   "WHERE entity <> '*' GROUP BY entity_type, entity HAVING MAX(n) < %s) t",
+                                   (min_samples,))[0]["n"]
+        return {"population": population, "individual": individual, "insufficient": insufficient}
+
     def stats(self) -> dict:
         s = self._dicts(
             "SELECT (SELECT COUNT(*) FROM events_norm) AS events, (SELECT COUNT(*) FROM incidents) AS incidents, "

@@ -39,7 +39,7 @@
 <body>
 <header>
   <h1><a href="/">mini-xdr 콘솔</a></h1>
-  <nav><a href="/">인시던트</a>{% if settings_enabled %}<a href="/settings">AI 설정</a>{% endif %}</nav>
+  <nav><a href="/">인시던트</a><a href="/anomalies">행위 이상</a>{% if settings_enabled %}<a href="/settings">AI 설정</a>{% endif %}</nav>
   <span class="muted">사건 조회는 읽기 전용 · 시각은 KST · 개념 학습·대체 실습(SKT 사전 싱크 필요)</span>
 </header>
 <main>{% block content %}{% endblock %}</main>

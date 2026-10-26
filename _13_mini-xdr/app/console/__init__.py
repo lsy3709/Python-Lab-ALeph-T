@@ -16,6 +16,9 @@ from app.timeline import build_timeline, offset_label
 
 KST = timezone(timedelta(hours=9), "KST")  # 한국은 서머타임이 없어 고정 오프셋으로 충분(Windows 는 tzdata 없음)
 TIMELINE_ITEMS = 200
+SHOWN_Z = 3.0  # 행위 이상 화면에서 보여 줄 최소 z(기본 ANOMALY_Z 와 같음)
+FEATURE_LABELS = {"events": "시간당 이벤트", "signals": "신호 종류", "login_fail": "로그인 실패",
+                  "ratio_404": "404 비율", "login_hour": "로그인 시각(KST)"}
 CSP = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 
@@ -85,6 +88,15 @@ def create_app(open_queries, settings_deps: settings_views.SettingsDeps | None =
                                start=events[0].ts if events else None, offset_label=offset_label,
                                truncated=cut or len(events) < inc["event_count"],
                                fetch_limit=TIMELINE_FETCH, item_limit=TIMELINE_ITEMS)
+
+    @app.get("/anomalies")
+    def anomalies():
+        with open_queries() as q:
+            rows, summary = q.list_anomalies(), q.baseline_summary()
+        for r in rows:  # 임계 미만 특징은 숨기고 z 큰 순서로
+            r["shown"] = sorted(((n, f) for n, f in r["features"].items() if f["z"] >= SHOWN_Z),
+                                key=lambda item: -item[1]["z"])
+        return render_template("anomalies.html", rows=rows, summary=summary, labels=FEATURE_LABELS)
 
     @app.get("/healthz")
     def healthz():
