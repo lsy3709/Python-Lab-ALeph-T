@@ -162,3 +162,50 @@ def test_reset_returns_to_env():
     assert r.status_code == 303 and h.repo.rows == {}
     html = h.client.get("/settings").get_data(as_text=True)
     assert ".env" in html and "AIza…kkkk" in html
+
+
+def test_settings_page_shows_both_provider_cards_and_switch_buttons():
+    h = Harness(env=Settings(_env_file=None, anthropic_api_key="sk-" + "c" * 30))
+    t = h.token()
+    h.post("/settings/llm", {"csrf": t, "provider": "gemini", "model": "gem-flash", "api_key": FAKE, "activate": "0"})
+    html = h.client.get("/settings").get_data(as_text=True)
+    assert 'id="card-claude"' in html and 'id="card-gemini"' in html
+    assert "AIza…9z8y" in html and "사용 중" in html and 'action="/settings/provider"' in html
+    assert FAKE not in html
+
+
+def test_save_only_keeps_active_provider_then_switch_button():
+    h = Harness()
+    t = h.token()
+    h.post("/settings/llm", {"csrf": t, "provider": "gemini", "model": "gem-flash", "api_key": FAKE, "activate": "0"})
+    assert "llm_provider" not in h.repo.rows and h.repo.rows["gemini_api_key"][1]
+    r = h.post("/settings/provider", {"csrf": t, "provider": "gemini"})
+    assert r.status_code == 303 and h.repo.rows["llm_provider"][0] == "gemini"
+    assert h.post("/settings/provider", {"provider": "claude"}).status_code == 400     # CSRF 없음
+    assert h.post("/settings/provider", {"csrf": t, "provider": "openai"}).status_code == 400
+
+
+def test_clear_one_provider_key():
+    h = Harness()
+    t = h.token()
+    h.post("/settings/llm", {"csrf": t, "provider": "gemini", "model": "gem-flash", "api_key": FAKE})
+    r = h.post("/settings/key/clear", {"csrf": t, "provider": "gemini"})
+    assert r.status_code == 303 and "gemini_api_key" not in h.repo.rows
+
+
+def test_connection_test_for_non_active_provider():
+    h = Harness(env=Settings(_env_file=None, llm_provider="claude"))
+    t = h.token()
+    h.post("/settings/llm", {"csrf": t, "provider": "gemini", "model": "gem-flash", "api_key": FAKE, "activate": "0"})
+    html = h.post("/settings/llm/test", {"csrf": t, "provider": "gemini"}).get_data(as_text=True)
+    assert h.calls[-1] == (FAKE, None) and "gem-pro" in html
+
+
+def test_ai_status_banner_on_every_page():
+    h = Harness()
+    t = h.token()
+    html = h.client.get("/").get_data(as_text=True)
+    assert "AI 꺼짐" in html and "규칙 판정" in html                  # 키 없음 → 규칙 판정 안내
+    h.post("/settings/llm", {"csrf": t, "provider": "gemini", "model": "gem-flash", "api_key": FAKE})
+    html = h.client.get("/anomalies").get_data(as_text=True)
+    assert "AI: gemini · gem-flash" in html and FAKE not in html

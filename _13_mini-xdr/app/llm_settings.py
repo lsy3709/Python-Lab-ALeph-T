@@ -72,6 +72,29 @@ def effective_llm_config(settings: Settings, repo: SettingsRepo, box: SecretBox 
     provider_source = "ui" if stored.get("llm_provider") else "env"
     if provider == "none":
         return LLMConfig("none", None, None, None, provider_source)
+    return _config_for(settings, stored, box, provider, provider_source)
+
+
+def config_for_provider(settings: Settings, repo: SettingsRepo, box: SecretBox | None, provider: str) -> LLMConfig:
+    """사용 중이 아니어도 그 공급자의 설정(연결 테스트용)."""
+    return _config_for(settings, repo.get_all(), box, provider, "ui")
+
+
+def provider_status(settings: Settings, repo: SettingsRepo, box: SecretBox | None) -> dict[str, dict]:
+    """화면용 — 사용 중이 아닌 공급자까지 키·모델 상태를 보여 준다(교체 전에 무엇이 준비됐는지)."""
+    stored = repo.get_all()
+    active = stored.get("llm_provider") or settings.llm_provider
+    out = {}
+    for provider in KEY_NAMES:
+        cfg = _config_for(settings, stored, box, provider, "ui")
+        out[provider] = {"active": provider == active, "model": cfg.model, "key_mask": cfg.key_mask,
+                         "key_source": cfg.key_source, "problem": cfg.problem,
+                         "ready": cfg.api_key is not None and cfg.model is not None}
+    return out
+
+
+def _config_for(settings: Settings, stored: dict, box: SecretBox | None, provider: str,
+                provider_source: str) -> LLMConfig:
     model = _model_or_none(stored.get(MODEL_NAMES[provider])) or _env_model(settings, provider)
     sealed = stored.get(KEY_NAMES[provider])
     if sealed:  # 웹 UI 저장 키가 있으면 그것만 쓴다 — 풀 수 없다고 .env 로 조용히 넘어가지 않는다
@@ -86,8 +109,10 @@ def effective_llm_config(settings: Settings, repo: SettingsRepo, box: SecretBox 
     return LLMConfig(provider, model, key, "env" if key else None, provider_source)
 
 
-def save_llm(repo: SettingsRepo, box: SecretBox | None, *, provider: str, model: str, api_key: str) -> None:
-    """입력을 모두 검증한 뒤에만 저장한다. 키를 비워 두면 기존 저장 키를 유지한다."""
+def save_llm(repo: SettingsRepo, box: SecretBox | None, *, provider: str, model: str, api_key: str,
+             activate: bool = True) -> None:
+    """입력을 모두 검증한 뒤에만 저장한다. 키를 비워 두면 기존 저장 키를 유지한다.
+    activate=False 면 키·모델만 저장하고 사용 중인 공급자는 바꾸지 않는다(미리 넣어 두기)."""
     model, api_key = (model or "").strip(), (api_key or "").strip()
     if provider not in PROVIDERS:
         raise ValueError("공급자는 claude · gemini · none 중 하나")
@@ -100,11 +125,26 @@ def save_llm(repo: SettingsRepo, box: SecretBox | None, *, provider: str, model:
             raise ValueError("API 키는 공백 없이 20~256자")
         if box is None:
             raise ValueError("SETTINGS_SECRET_KEY 가 없어 키를 저장할 수 없습니다 — .env 에 먼저 설정하세요")
-    repo.put("llm_provider", provider, False)
+    if activate or provider == "none":
+        repo.put("llm_provider", provider, False)
     if provider != "none" and model:
         repo.put(MODEL_NAMES[provider], model, False)
     if api_key:
         repo.put(KEY_NAMES[provider], box.seal(api_key), True)
+
+
+def set_active_provider(repo: SettingsRepo, provider: str) -> None:
+    """사용할 AI 만 바꾼다(저장된 키·모델은 그대로)."""
+    if provider not in PROVIDERS:
+        raise ValueError("공급자는 claude · gemini · none 중 하나")
+    repo.put("llm_provider", provider, False)
+
+
+def clear_provider_key(repo: SettingsRepo, provider: str) -> None:
+    """한 공급자의 웹 UI 저장 키만 지운다(그 공급자는 .env 키로 돌아간다)."""
+    if provider not in KEY_NAMES:
+        raise ValueError("키를 지울 공급자는 claude · gemini 중 하나")
+    repo.delete(KEY_NAMES[provider])
 
 
 def reset_llm(repo: SettingsRepo) -> None:

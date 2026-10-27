@@ -121,3 +121,35 @@ def test_repr_never_shows_key(box):
     cfg = effective_llm_config(env(llm_provider="gemini", gemini_api_key=FAKE_GEMINI, gemini_model="m"),
                                FakeRepo(), box)
     assert FAKE_GEMINI not in repr(cfg)
+
+
+def test_provider_status_shows_both_providers(box):
+    from app.llm_settings import provider_status
+    repo = FakeRepo()
+    save_llm(repo, box, provider="gemini", model="gm", api_key=FAKE_GEMINI)
+    st = provider_status(env(llm_provider="claude", anthropic_api_key=FAKE_CLAUDE), repo, box)
+    assert st["gemini"]["key_mask"] == "AIza…abcd" and st["gemini"]["key_source"] == "ui" and st["gemini"]["model"] == "gm"
+    assert st["claude"]["key_source"] == "env" and st["claude"]["model"] == "claude-haiku-5-5"
+    assert st["gemini"]["active"] and not st["claude"]["active"]      # save_llm 은 기본으로 그 공급자를 사용으로 바꾼다
+
+
+def test_save_without_activate_keeps_active_provider(box):
+    repo = FakeRepo()
+    save_llm(repo, box, provider="claude", model="", api_key=FAKE_CLAUDE)
+    save_llm(repo, box, provider="gemini", model="gm", api_key=FAKE_GEMINI, activate=False)
+    cfg = effective_llm_config(env(), repo, box)
+    assert cfg.provider == "claude" and repo.rows["gemini_api_key"][1] is True
+
+
+def test_switch_provider_and_clear_one_key(box):
+    from app.llm_settings import clear_provider_key, set_active_provider
+    repo = FakeRepo()
+    save_llm(repo, box, provider="gemini", model="gm", api_key=FAKE_GEMINI)
+    save_llm(repo, box, provider="claude", model="", api_key=FAKE_CLAUDE, activate=False)
+    set_active_provider(repo, "claude")
+    assert effective_llm_config(env(), repo, box).provider == "claude"
+    clear_provider_key(repo, "gemini")
+    assert "gemini_api_key" not in repo.rows and "claude_api_key" in repo.rows
+    import pytest as _pytest
+    with _pytest.raises(ValueError):
+        set_active_provider(repo, "openai")

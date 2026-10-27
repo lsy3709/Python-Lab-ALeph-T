@@ -34,6 +34,16 @@
   input { background:#0f1419; color:var(--text); border:1px solid var(--line); padding:4px 8px; border-radius:4px; }
   nav a { margin-right:14px; }
   code { color:#9fd3ff; }
+  .ai-status { margin-left:auto; font-size:12px; padding:3px 10px; border-radius:10px; border:1px solid var(--line); }
+  .ai-status.on { border-color:#2ecc71; } .ai-status.off { border-color:#e67e22; }
+  .choices { display:flex; gap:12px; flex-wrap:wrap; }
+  .choice { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:10px 12px; min-width:220px; }
+  .choice.on { border-color:#2ecc71; }
+  .card { background:#121922; border:1px solid var(--line); border-radius:8px; padding:12px; margin:12px 0; }
+  .card-head { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; margin-bottom:8px; }
+  .card form.panel { margin:6px 0; }
+  form.inline { display:inline; }
+  .bad-text { color:#e74c3c; }
 </style>
 </head>
 <body>
@@ -41,6 +51,10 @@
   <h1><a href="/">mini-xdr 콘솔</a></h1>
   <nav><a href="/">인시던트</a><a href="/anomalies">행위 이상</a><a href="/usage">AI 사용량</a>{% if settings_enabled %}<a href="/settings">AI 설정</a>{% endif %}</nav>
   <span class="muted">사건 조회는 읽기 전용 · 시각은 KST · 개념 학습·대체 실습(SKT 사전 싱크 필요)</span>
+  {% if ai_status %}
+  {% if not ai_status.reason %}<a class="ai-status on" href="/settings">AI: {{ ai_status.provider }} · {{ ai_status.model }}</a>
+  {% else %}<a class="ai-status off" href="/settings">AI 꺼짐 — 규칙 판정({{ ai_status.reason }}) · 설정</a>{% endif %}
+  {% endif %}
 </header>
 <main>{% block content %}{% endblock %}</main>
 </body>

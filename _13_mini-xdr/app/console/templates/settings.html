@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}AI 설정 — mini-xdr{% endblock %}
 {% block content %}
-<h2>AI 설정 <span class="muted">키 교체 · 연결 테스트</span></h2>
-{% if msg %}<div class="note">{{ msg }}</div>{% endif %}
+<h2>AI 설정 <span class="muted">사용할 AI 교체 · 키 입력 · 연결 테스트</span></h2>
+{% if msg %}<div class="note good">{{ msg }}</div>{% endif %}
 {% if error %}<div class="note bad">{{ error }}</div>{% endif %}
 
 <div class="stats">
-  <div class="stat"><span class="muted">공급자</span><b>{{ cfg.provider }}</b><span class="muted">{{ "웹 UI" if cfg.provider_source == "ui" else ".env" }}</span></div>
+  <div class="stat"><span class="muted">지금 쓰는 AI</span><b>{{ labels.get(cfg.provider, cfg.provider) }}</b><span class="muted">{{ "웹 UI 에서 고름" if cfg.provider_source == "ui" else ".env 기본값" }}</span></div>
   <div class="stat"><span class="muted">모델</span><b>{{ cfg.model or "-" }}</b></div>
   <div class="stat"><span class="muted">API 키</span><b>{{ cfg.key_mask }}</b><span class="muted">{{ key_source }}</span></div>
-  <div class="stat"><span class="muted">상태</span><b>{{ "사용 가능" if not cfg.disabled_reason else cfg.disabled_reason }}</b></div>
+  <div class="stat"><span class="muted">판정 방식</span><b>{{ "AI 판정" if not cfg.disabled_reason else "규칙 판정" }}</b><span class="muted">{{ cfg.disabled_reason or "호출 깔때기를 통과한 것만 AI 에 물음" }}</span></div>
 </div>
 
 {% if not box_ready %}
@@ -20,48 +20,76 @@
 </div>
 {% endif %}
 
-<h3>1. 키 교체</h3>
-<form class="panel" method="post" action="/settings/llm" autocomplete="off">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>공급자
-    <select name="provider">
-      {% for p in providers %}<option value="{{ p }}"{% if p == cfg.provider %} selected{% endif %}>{{ p }}</option>{% endfor %}
-    </select>
-  </label>
-  <label>모델 ID <input name="model" value="{{ cfg.model or '' }}" list="model-hints" placeholder="연결 테스트로 받은 목록에서 고르기" size="34"></label>
-  <label>API 키 <input type="password" name="api_key" autocomplete="off" placeholder="비워 두면 기존 키 유지" size="34"{% if not box_ready %} disabled{% endif %}></label>
-  <button type="submit">저장</button>
-</form>
-
-<h3>2. 연결 테스트</h3>
-<form class="panel" method="post" action="/settings/llm/test">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>모델 ID <input name="model" value="{{ test_model }}" list="model-hints" size="34"></label>
-  <label><input type="checkbox" name="sample" value="1"> 샘플 호출까지(짧은 문장 1회 — 토큰 소량 사용)</label>
-  <button type="submit">테스트</button>
-  <span class="muted">체크하지 않으면 모델 목록만 조회(토큰 0)</span>
-</form>
-<datalist id="model-hints">{% for m in model_hints %}<option value="{{ m }}">{% endfor %}</datalist>
-
-{% if result %}
-<div class="note {{ 'good' if result.ok else 'bad' }}">
-  <b>{{ "성공" if result.ok else "실패" }}</b> · {{ result.provider }} · {{ result.step }}
-  {% if result.error %}<br>오류: {{ result.error }}{% endif %}
+<h3>1. 사용할 AI 고르기 <span class="muted">— 저장된 키·모델은 그대로 두고 교체만</span></h3>
+<div class="choices">
+  {% for p in providers %}
+  <form method="post" action="/settings/provider" class="choice{{ ' on' if cfg.provider == p else '' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="provider" value="{{ p }}">
+    <b>{{ labels[p] }}</b><br>
+    {% if p == "none" %}<span class="muted">LLM 을 부르지 않고 규칙으로만 판정</span>
+    {% elif cards[p].ready %}<span class="muted">준비됨 · {{ cards[p].model }}</span>
+    {% else %}<span class="muted">키 또는 모델이 없음 — 아래 2번에서 입력</span>{% endif %}<br>
+    {% if cfg.provider == p %}<span class="badge p-P4">사용 중</span>
+    {% else %}<button type="submit">이것으로 교체</button>{% endif %}
+  </form>
+  {% endfor %}
 </div>
-<div class="scroll"><table>
-  {% if result.models %}<tr><th>사용 가능 모델</th><td>모델 {{ result.models|length }}개
-    <details><summary>목록 보기</summary>{{ result.models|join(", ") }}</details></td></tr>{% endif %}
-  {% if result.step == "샘플 호출" %}
-  <tr><th>모델</th><td>{{ result.model }}</td></tr>
-  <tr><th>응답</th><td>{{ result.reply or "-" }}</td></tr>
-  <tr><th>토큰(입력 / 출력)</th><td>{{ result.input_tokens or 0 }} / {{ result.output_tokens or 0 }}</td></tr>
-  <tr><th>지연</th><td>{{ result.latency_ms or "-" }} ms</td></tr>
-  <tr><th>비용 추정</th><td>{{ "$%.6f"|format(cost) if cost else "단가 미입력(Gemini) 또는 0" }}</td></tr>
-  {% endif %}
-</table></div>
-{% endif %}
 
-<h3>3. 웹 UI 설정 지우기</h3>
+<h3>2. 공급자별 키·모델 입력</h3>
+{% for p in ["gemini", "claude"] %}{% set c = cards[p] %}
+<div class="card" id="card-{{ p }}">
+  <div class="card-head">
+    <b>{{ labels[p] }}</b>
+    {% if c.active %}<span class="badge p-P4">사용 중</span>{% endif %}
+    <span class="muted">키 {{ c.key_mask }} ({{ key_labels.get(c.key_source, "없음") }}) · 모델 {{ c.model or "-" }}</span>
+    {% if c.problem %}<span class="muted bad-text">· {{ c.problem }}</span>{% endif %}
+  </div>
+  <form class="panel" method="post" action="/settings/llm" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="provider" value="{{ p }}">
+    <label>API 키 <input type="password" name="api_key" autocomplete="off" size="34"
+      placeholder="{{ hints[p] }} — 비우면 기존 키 유지"{% if not box_ready %} disabled{% endif %}></label>
+    <label>모델 ID <input name="model" value="{{ c.model or '' }}" list="model-hints-{{ p }}" size="26" placeholder="연결 테스트 목록에서 고르기"></label>
+    <button type="submit" name="activate" value="1">저장하고 이 AI 사용</button>
+    <button type="submit" name="activate" value="0">저장만</button>
+  </form>
+  <form class="panel" method="post" action="/settings/llm/test">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="provider" value="{{ p }}">
+    <label>모델 ID <input name="model" value="{{ test_model if result and result.provider == p and test_model else (c.model or '') }}" list="model-hints-{{ p }}" size="26"></label>
+    <label><input type="checkbox" name="sample" value="1"> 샘플 호출까지(짧은 문장 1회 — 토큰 소량)</label>
+    <button type="submit">연결 테스트</button>
+    <span class="muted">체크하지 않으면 모델 목록만(토큰 0)</span>
+  </form>
+  {% if c.key_source == "ui" %}
+  <form method="post" action="/settings/key/clear" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="provider" value="{{ p }}">
+    <button type="submit">이 공급자의 저장 키 삭제</button>
+  </form>
+  {% endif %}
+  <datalist id="model-hints-{{ p }}">{% if result and result.provider == p %}{% for m in model_hints %}<option value="{{ m }}">{% endfor %}{% endif %}</datalist>
+  {% if result and result.provider == p %}
+  <div class="note {{ 'good' if result.ok else 'bad' }}">
+    <b>{{ "성공" if result.ok else "실패" }}</b> · {{ result.step }}{% if result.error %}<br>오류: {{ result.error }}{% endif %}
+  </div>
+  <div class="scroll"><table>
+    {% if result.models %}<tr><th>사용 가능 모델</th><td>모델 {{ result.models|length }}개
+      <details><summary>목록 보기</summary>{{ result.models|join(", ") }}</details></td></tr>{% endif %}
+    {% if result.step == "샘플 호출" %}
+    <tr><th>모델</th><td>{{ result.model }}</td></tr>
+    <tr><th>응답</th><td>{{ result.reply or "-" }}</td></tr>
+    <tr><th>토큰(입력 / 출력)</th><td>{{ result.input_tokens or 0 }} / {{ result.output_tokens or 0 }}</td></tr>
+    <tr><th>지연</th><td>{{ result.latency_ms or "-" }} ms</td></tr>
+    <tr><th>비용 추정</th><td>{{ "$%.6f"|format(cost) if cost else "단가 미입력(Gemini) 또는 0" }}</td></tr>
+    {% endif %}
+  </table></div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<h3>3. 웹 UI 설정 모두 지우기</h3>
 <form class="panel" method="post" action="/settings/llm/reset">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <button type="submit">지우고 .env 로 되돌리기</button>
@@ -69,6 +97,6 @@
 
 <div class="note">
   키는 화면에 다시 표시되지 않습니다(앞 4자…뒤 4자만). DB 에는 암호문으로만 저장되고 복호화 열쇠는 .env 에 있습니다.
-  우선순위: 웹 UI 저장값 &gt; .env·환경변수. 샘플 호출은 llm_calls 에 <code>connection_test</code> 로 기록됩니다.
+  우선순위: 웹 UI 저장값 &gt; .env·환경변수. 워커는 매 주기 이 설정을 다시 읽습니다. 샘플 호출은 llm_calls 에 <code>connection_test</code> 로 기록됩니다.
 </div>
 {% endblock %}
