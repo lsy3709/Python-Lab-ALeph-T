@@ -1,0 +1,438 @@
+{
+ "rules": {
+  "100110": {
+   "alt": [],
+   "desc": "S11 Snort portscan SYN",
+   "level": 5,
+   "mitre": []
+  },
+  "100111": {
+   "alt": [],
+   "desc": "S11: Snort portscan threshold exceeded from [IP]",
+   "level": 12,
+   "mitre": []
+  },
+  "100210": {
+   "alt": [],
+   "desc": "연습 웹앱 로그인 실패",
+   "level": 5,
+   "mitre": []
+  },
+  "100211": {
+   "alt": [],
+   "desc": "연습 웹앱 브루트포스 의심 (동일 IP 다수 실패)",
+   "level": 10,
+   "mitre": [
+    "T1110"
+   ]
+  },
+  "100220": {
+   "alt": [],
+   "desc": "게시판 웹 디렉터리에 실행형 파일 생성/변조 - 웹셸 의심",
+   "level": 12,
+   "mitre": [
+    "T1505.003"
+   ]
+  },
+  "100221": {
+   "alt": [],
+   "desc": "게시판 화면 템플릿 파일 변경 - 위변조 의심",
+   "level": 8,
+   "mitre": [
+    "T1565.001"
+   ]
+  },
+  "100222": {
+   "alt": [],
+   "desc": "게시판 웹 디렉터리의 실행형 파일 삭제 - 흔적 제거 의심(확인 필요)",
+   "level": 10,
+   "mitre": [
+    "T1070.004"
+   ]
+  },
+  "100230": {
+   "alt": [
+    "연습 웹앱 저속 브루트포스 의심 (동일 계정, 30분 다수 실패)"
+   ],
+   "desc": "Flask 게시판 HTTP 404 발생",
+   "level": 10,
+   "mitre": []
+  },
+  "100231": {
+   "alt": [
+    "연습 웹앱 심야 로그인 성공"
+   ],
+   "desc": "Flask 게시판 HTTP 404 폭주 - 웹 스캐너 의심",
+   "level": 10,
+   "mitre": [
+    "T1595"
+   ]
+  },
+  "100232": {
+   "alt": [],
+   "desc": "연습 웹앱 저속 브루트포스 의심 (동일 계정, 30분 다수 실패)",
+   "level": 10,
+   "mitre": [
+    "T1110.001"
+   ]
+  },
+  "100233": {
+   "alt": [
+    "연습 웹앱 한 계정 다중 출발지 로그인 (5분, 서로 다른 IP)"
+   ],
+   "desc": "연습 웹앱 심야 로그인 성공",
+   "level": 10,
+   "mitre": [
+    "T1078"
+   ]
+  },
+  "100241": {
+   "alt": [],
+   "desc": "Suricata Nmap 포트 스캔 탐지",
+   "level": 10,
+   "mitre": [
+    "T1046"
+   ]
+  },
+  "100242": {
+   "alt": [],
+   "desc": "Suricata SQL Injection 탐지",
+   "level": 12,
+   "mitre": [
+    "T1190"
+   ]
+  },
+  "100243": {
+   "alt": [],
+   "desc": "Suricata IDS 경보 폭주 - 동일 IP 5회 초과",
+   "level": 12,
+   "mitre": []
+  },
+  "100250": {
+   "alt": [],
+   "desc": "MySQL 민감 표(users) 조회 - 데이터 계층 감사",
+   "level": 10,
+   "mitre": [
+    "T1213"
+   ]
+  },
+  "100260": {
+   "alt": [],
+   "desc": "게시판 admin API 키 인증 실패 (S6)",
+   "level": 5,
+   "mitre": []
+  },
+  "100262": {
+   "alt": [],
+   "desc": "게시판 골드 등급 민감자료 열람 (S9)",
+   "level": 6,
+   "mitre": []
+  },
+  "100263": {
+   "alt": [],
+   "desc": "게시판 과잉권한(admin) 위반 탐지 (S9)",
+   "level": 10,
+   "mitre": [
+    "T1078.003"
+   ]
+  },
+  "100265": {
+   "alt": [],
+   "desc": "Snort 네트워크 포트스캔 탐지 (S11)",
+   "level": 10,
+   "mitre": [
+    "T1046"
+   ]
+  },
+  "19003": {
+   "alt": [],
+   "desc": "SCA summary: CIS Benchmark for Amazon Linux 2023 Benchmark v1.0.0.: Sc",
+   "level": 5,
+   "mitre": []
+  },
+  "19004": {
+   "alt": [],
+   "desc": "SCA summary: CIS Ubuntu Linux 22.04 LTS Benchmark v1.0.0.: Score less ",
+   "level": 7,
+   "mitre": []
+  },
+  "19005": {
+   "alt": [
+    "SCA summary: System audit for Unix based systems: Score less than 30% "
+   ],
+   "desc": "SCA summary: CIS Microsoft Windows 11 Enterprise Benchmark v1.0.0: Sco",
+   "level": 9,
+   "mitre": []
+  },
+  "19007": {
+   "alt": [
+    "CIS Ubuntu Linux 22.04 LTS Benchmark v1.0.0.: Ensure permissions on /e",
+    "CIS Microsoft Windows 11 Enterprise Benchmark v1.0.0: Ensure 'Windows "
+   ],
+   "desc": "CIS Microsoft Windows 11 Enterprise Benchmark v1.0.0: Ensure 'Turn off",
+   "level": 7,
+   "mitre": []
+  },
+  "19012": {
+   "alt": [],
+   "desc": "CIS Microsoft Windows 11 Enterprise Benchmark v1.0.0: Ensure 'Network ",
+   "level": 5,
+   "mitre": []
+  },
+  "19013": {
+   "alt": [],
+   "desc": "CIS Microsoft Windows 11 Enterprise Benchmark v1.0.0: Ensure 'Password",
+   "level": 5,
+   "mitre": []
+  },
+  "202": {
+   "alt": [],
+   "desc": "Agent event queue is 90% full.",
+   "level": 7,
+   "mitre": []
+  },
+  "203": {
+   "alt": [],
+   "desc": "Agent event queue is full. Events may be lost.",
+   "level": 9,
+   "mitre": []
+  },
+  "204": {
+   "alt": [],
+   "desc": "Agent event queue is flooded. Check the agent configuration.",
+   "level": 12,
+   "mitre": []
+  },
+  "23503": {
+   "alt": [
+    "CVE-2025-13462 affects Python 3.10.0 (64-bit)",
+    "CVE-2025-13462 affects Python 3.13.2 (64-bit)"
+   ],
+   "desc": "CVE-2021-3426 affects Python 3.10.0 (64-bit)",
+   "level": 5,
+   "mitre": []
+  },
+  "23504": {
+   "alt": [
+    "CVE-2018-25032 affects Python 3.10.0 (64-bit)",
+    "CVE-2023-27043 affects Python 3.10.0 (64-bit)"
+   ],
+   "desc": "CVE-2025-12084 affects Python 3.10.0 (64-bit)",
+   "level": 7,
+   "mitre": []
+  },
+  "23505": {
+   "alt": [
+    "CVE-2022-42919 affects Python 3.10.0 (64-bit)",
+    "CVE-2024-7592 affects Python 3.10.0 (64-bit)"
+   ],
+   "desc": "CVE-2022-45061 affects Python 3.10.0 (64-bit)",
+   "level": 10,
+   "mitre": []
+  },
+  "23506": {
+   "alt": [
+    "CVE-2022-37454 affects Python 3.9.13 (32-bit)"
+   ],
+   "desc": "CVE-2022-37454 affects Python 3.10.0 (64-bit)",
+   "level": 13,
+   "mitre": []
+  },
+  "2902": {
+   "alt": [],
+   "desc": "New dpkg (Debian Package) installed.",
+   "level": 7,
+   "mitre": []
+  },
+  "2904": {
+   "alt": [],
+   "desc": "Dpkg (Debian Package) half configured.",
+   "level": 7,
+   "mitre": []
+  },
+  "510": {
+   "alt": [],
+   "desc": "Host-based anomaly detection event (rootcheck).",
+   "level": 7,
+   "mitre": []
+  },
+  "531": {
+   "alt": [],
+   "desc": "Partition usage reached 100% (disk space monitor).",
+   "level": 7,
+   "mitre": []
+  },
+  "533": {
+   "alt": [],
+   "desc": "Listened ports status (netstat) changed (new port opened or closed).",
+   "level": 7,
+   "mitre": []
+  },
+  "550": {
+   "alt": [],
+   "desc": "Integrity checksum changed.",
+   "level": 7,
+   "mitre": [
+    "T1565.001"
+   ]
+  },
+  "592": {
+   "alt": [],
+   "desc": "Log file size reduced.",
+   "level": 8,
+   "mitre": [
+    "T1565.001"
+   ]
+  },
+  "594": {
+   "alt": [],
+   "desc": "Registry Key Integrity Checksum Changed",
+   "level": 5,
+   "mitre": [
+    "T1112",
+    "T1565.001"
+   ]
+  },
+  "597": {
+   "alt": [],
+   "desc": "Registry Key Entry Deleted.",
+   "level": 5,
+   "mitre": [
+    "T1070.004",
+    "T1112",
+    "T1485"
+   ]
+  },
+  "598": {
+   "alt": [],
+   "desc": "Registry Key Entry Added to the System",
+   "level": 5,
+   "mitre": [
+    "T1112"
+   ]
+  },
+  "60110": {
+   "alt": [],
+   "desc": "User account changed",
+   "level": 8,
+   "mitre": [
+    "T1098"
+   ]
+  },
+  "60122": {
+   "alt": [],
+   "desc": "Logon Failure - Unknown user or bad password",
+   "level": 5,
+   "mitre": [
+    "T1531"
+   ]
+  },
+  "60132": {
+   "alt": [],
+   "desc": "System time changed",
+   "level": 5,
+   "mitre": []
+  },
+  "60602": {
+   "alt": [],
+   "desc": "Windows application error event.",
+   "level": 9,
+   "mitre": []
+  },
+  "60604": {
+   "alt": [],
+   "desc": "Chrome remote desktop attempt - Client connected [이메일]",
+   "level": 5,
+   "mitre": []
+  },
+  "60605": {
+   "alt": [],
+   "desc": "Chrome remote desktop attempt - disconnected ([이메일]).",
+   "level": 5,
+   "mitre": []
+  },
+  "60702": {
+   "alt": [],
+   "desc": "The VSS service is shutting down due to idle timeout.",
+   "level": 5,
+   "mitre": []
+  },
+  "60775": {
+   "alt": [],
+   "desc": "SessionEnv was unavailable to handle a notification event.",
+   "level": 5,
+   "mitre": []
+  },
+  "60776": {
+   "alt": [],
+   "desc": "SessionEnv was unavailable to handle a critical notification event.",
+   "level": 7,
+   "mitre": []
+  },
+  "61020": {
+   "alt": [],
+   "desc": ".NET Runtime - CLR 2.0 does not support profilers written for CLR 1.x.",
+   "level": 5,
+   "mitre": []
+  },
+  "61060": {
+   "alt": [],
+   "desc": "The open procedure for service remote access failed.",
+   "level": 5,
+   "mitre": []
+  },
+  "61061": {
+   "alt": [],
+   "desc": "Multiple Windows error application events.",
+   "level": 10,
+   "mitre": []
+  },
+  "61102": {
+   "alt": [],
+   "desc": "Windows System error event",
+   "level": 5,
+   "mitre": []
+  },
+  "61110": {
+   "alt": [],
+   "desc": "Multiple System error events",
+   "level": 10,
+   "mitre": []
+  },
+  "61138": {
+   "alt": [],
+   "desc": "New Windows Service Created",
+   "level": 5,
+   "mitre": [
+    "T1543.003"
+   ]
+  },
+  "750": {
+   "alt": [],
+   "desc": "Registry Value Integrity Checksum Changed",
+   "level": 5,
+   "mitre": [
+    "T1112",
+    "T1565.001"
+   ]
+  },
+  "751": {
+   "alt": [],
+   "desc": "Registry Value Entry Deleted.",
+   "level": 5,
+   "mitre": [
+    "T1070.004",
+    "T1112",
+    "T1485"
+   ]
+  },
+  "752": {
+   "alt": [],
+   "desc": "Registry Value Entry Added to the System",
+   "level": 5,
+   "mitre": [
+    "T1112"
+   ]
+  }
+ }
+}
