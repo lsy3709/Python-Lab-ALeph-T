@@ -29,7 +29,16 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_model: str | None = None
     max_daily_llm_calls: int = Field(200, ge=0)
+    max_hourly_llm_calls: int = Field(60, ge=0)
     prompt_cache_ttl: Literal["5m", "1h"] = "5m"
+    gemini_escalate_model: str | None = None   # 비우면 Gemini 는 승급하지 않음(모델 ID 는 직접 지정 — 추측 금지)
+
+    # 트리아지(호출 깔때기)
+    triage_lookback_min: int = Field(60, ge=1)        # 열린 인시던트 + 마지막 이벤트가 이 안인 것만 자동 판정
+    triage_batch: int = Field(5, ge=1, le=10)         # G6 묶음 크기
+    triage_cooldown_sec: int = Field(300, ge=0)       # G4 쿨다운
+    verdict_cache_hours: int = Field(24, ge=1)        # G3 지문 캐시 유효 시간
+    whitelist_cidrs: str = "127.0.0.1/32"             # G1 — 쉼표로 여러 대역
 
     # 수집·상관
     graylog_url: str = "http://localhost:9000"

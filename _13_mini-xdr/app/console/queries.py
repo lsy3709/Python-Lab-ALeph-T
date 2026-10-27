@@ -81,6 +81,41 @@ class ConsoleQueries:
                            "LIMIT %s", (iid, limit))
         return [r["u"] for r in rows]
 
+    def latest_triage(self, iid: int) -> dict | None:
+        rows = self._dicts("SELECT source, gate, model, priority, verdict, false_positive_likelihood, confidence, "
+                           "reasoning_ko, recommended_playbook, created_at FROM triage_results WHERE incident_id = %s "
+                           "ORDER BY id DESC LIMIT 1", (iid,))
+        if not rows:
+            return None
+        r = rows[0]
+        for k in ("false_positive_likelihood", "confidence"):
+            r[k] = float(r[k]) if r[k] is not None else None
+        return r
+
+    def usage_stats(self) -> dict:
+        """판정 출처·관문 분포와 LLM 호출 집계(연결 테스트 제외)."""
+        decided = self._dicts("SELECT source, gate, COUNT(*) AS n FROM triage_results GROUP BY source, gate")
+        by_gate, by_source = {}, {}
+        for r in decided:
+            by_gate[r["gate"]] = by_gate.get(r["gate"], 0) + r["n"]
+            by_source[r["source"]] = by_source.get(r["source"], 0) + r["n"]
+        calls = self._dicts(
+            "SELECT COUNT(*) AS requests, COALESCE(SUM(input_tokens), 0) AS tokens_in, "
+            "COALESCE(SUM(output_tokens), 0) AS tokens_out, COALESCE(SUM(cache_read_tokens), 0) AS cache_read, "
+            "COALESCE(SUM(cache_write_tokens), 0) AS cache_write, COALESCE(SUM(cost_usd_est), 0) AS cost "
+            "FROM llm_calls WHERE gate_reason <> 'connection_test'")[0]
+        by_status = {r["status"]: r["n"] for r in self._dicts(
+            "SELECT status, COUNT(*) AS n FROM llm_calls WHERE gate_reason <> 'connection_test' GROUP BY status")}
+        by_model = {r["model"]: r["n"] for r in self._dicts(
+            "SELECT model, COUNT(*) AS n FROM llm_calls WHERE gate_reason <> 'connection_test' GROUP BY model")}
+        cache = self._dicts("SELECT COUNT(*) AS n, COALESCE(SUM(hits), 0) AS hits FROM verdict_cache")[0]
+        return {"decisions": sum(by_gate.values()), "by_gate": by_gate, "by_source": by_source,
+                "llm_decisions": by_source.get("llm", 0), "cache_decisions": by_source.get("cache", 0),
+                "requests": calls["requests"], "tokens_in": int(calls["tokens_in"]), "tokens_out": int(calls["tokens_out"]),
+                "cache_read": int(calls["cache_read"]), "cache_write": int(calls["cache_write"]),
+                "cost": float(calls["cost"]), "by_status": by_status, "by_model": by_model,
+                "floored": by_gate.get("LLM-FLOOR", 0), "cache_rows": cache["n"], "cache_hits": int(cache["hits"])}
+
     def list_anomalies(self, limit: int = 100) -> list[dict]:
         rows = self._dicts("SELECT id, entity_type, entity, ts, score, features FROM anomaly_scores "
                            "ORDER BY ts DESC, id DESC LIMIT %s", (limit,))

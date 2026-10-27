@@ -95,3 +95,23 @@ def test_llm_usage_counts_and_breaker(store):
     store.record_llm_call(LLMResult("gemini", "m", "ok"), 1, "connection_test")         # 연결 테스트는 예산에서 제외
     u = store.llm_usage(datetime.now(timezone.utc))
     assert (u["day"], u["hour"], u["recent_errors"]) == (4, 4, 3)
+
+
+def test_console_reads_triage_and_usage(store, fresh_db):
+    from app.console.queries import ConsoleQueries, connect_readonly
+    seed(store)
+    iid = store.triage_candidates(NOW - timedelta(hours=1), None)[0]["id"]
+    run_triage(store, LLMRoute(FakeTriager([("ok", {f"INC-{iid}": v(priority="P2")})]), "gemini-3.5-flash-lite"),
+               TriageConfig(), NOW)
+    store.record_llm_call(LLMResult("gemini", "m", "ok", input_tokens=99), 1, "connection_test")  # 집계에서 빠져야 함
+    conn = connect_readonly(host="127.0.0.1", port=fresh_db["port"], user="root", password=ROOT_PW,
+                            database=fresh_db["name"])
+    try:
+        q = ConsoleQueries(conn)
+        t = q.latest_triage(iid)
+        assert (t["source"], t["gate"], t["priority"], t["confidence"]) == ("llm", "LLM", "P2", 0.8)
+        u = q.usage_stats()
+        assert (u["decisions"], u["llm_decisions"], u["requests"], u["tokens_in"], u["cache_read"]) == (1, 1, 1, 300, 1800)
+        assert u["by_gate"] == {"LLM": 1} and u["cache_rows"] == 1
+    finally:
+        conn.close()

@@ -51,6 +51,18 @@ class FakeQueries:
     def users(self, iid):
         return self.user_list
 
+    triage = None
+
+    def latest_triage(self, iid):
+        return self.triage
+
+    def usage_stats(self):
+        return {"decisions": 8, "by_gate": {"G2": 4, "G3": 1, "LLM": 1, "LLM-FLOOR": 1, "NOKEY": 1},
+                "by_source": {"rule": 5, "cache": 1, "llm": 2}, "llm_decisions": 2, "cache_decisions": 1,
+                "requests": 3, "tokens_in": 6000, "tokens_out": 300, "cache_read": 4000, "cache_write": 0,
+                "cost": 0.0, "by_status": {"ok": 3}, "by_model": {"gemini-3.5-flash-lite": 3}, "floored": 1,
+                "cache_rows": 2, "cache_hits": 1}
+
     def list_anomalies(self, limit=100):
         return self.anomalies
 
@@ -141,3 +153,23 @@ def test_healthz_ok_and_hides_errors(fake):
     r = client_for(fake, fail=True).get("/healthz")
     assert r.status_code == 503 and r.get_json() == {"ok": False}
     assert "10.0.0.5" not in r.get_data(as_text=True)
+
+
+TRIAGE = {"source": "llm", "gate": "LLM-FLOOR", "model": "gemini-3.5-flash-lite", "priority": "P2",
+          "verdict": "true_positive", "false_positive_likelihood": 0.1, "confidence": 0.9,
+          "reasoning_ko": "203.0.113.9 다계층 공격 <b>강조</b>", "recommended_playbook": "block_ip", "created_at": T0}
+
+
+def test_detail_shows_latest_triage_escaped(fake):
+    fake.triage = TRIAGE
+    html = client_for(fake).get("/incidents/1").get_data(as_text=True)
+    assert "block_ip" in html and "LLM-FLOOR" in html and "gemini-3.5-flash-lite" in html and "0.90" in html
+    assert "<b>강조</b>" not in html and "&lt;b&gt;" in html          # LLM 출력도 신뢰하지 않는다
+    assert "아직 없음" not in html
+
+
+def test_usage_page(fake):
+    html = client_for(fake).get("/usage").get_data(as_text=True)
+    for text in ("LLM 호출률", "25.0%", "지문 캐시 적중률", "33.3%", "프롬프트 캐시", "40.0%", "하한 적용", "LLM-FLOOR"):
+        assert text in html, text
+    assert 'href="/usage"' in client_for(fake).get("/").get_data(as_text=True)

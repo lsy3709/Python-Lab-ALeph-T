@@ -12,7 +12,18 @@
   <div class="stat"><span class="muted">상태</span><b>{{ "열림" if inc.status == "open" else "닫힘" }}</b></div>
 </div>
 <p class="muted">관련 계정: {{ users|join(", ") if users else "없음" }} · 지문 <code>{{ (inc.fingerprint or "")[:12] }}</code></p>
-<div class="note">AI 판정: 아직 없음 — P4(LLM 트리아지)에서 연결됩니다. 지금 우선순위는 규칙 하한 기준입니다.</div>
+{% if triage %}
+<div class="note {{ 'good' if triage.source == 'llm' else '' }}">
+  <b>AI 판정</b> · {{ source_labels.get(triage.source, triage.source) }} · 관문 {{ triage.gate }}{% if triage.model %} · {{ triage.model }}{% endif %} · {{ triage.created_at|kst }}<br>
+  우선순위 <span class="badge p-{{ triage.priority }}">{{ triage.priority }}</span> {{ triage.verdict }} · 권고 <b>{{ triage.recommended_playbook }}</b>
+  · 확신 {{ "%.2f"|format(triage.confidence) if triage.confidence is not none else "-" }}
+  · 오탐 가능성 {{ "%.2f"|format(triage.false_positive_likelihood) if triage.false_positive_likelihood is not none else "-" }}<br>
+  {{ triage.reasoning_ko }}
+  <br><span class="muted">권고는 실행되지 않습니다 — 대응은 사람이 승인합니다(P5).</span>
+</div>
+{% else %}
+<div class="note">AI 판정: 아직 없음 — 열린 인시던트와 최근 인시던트만 자동 판정합니다(호출 깔때기). 지금 우선순위는 규칙 하한 기준입니다.</div>
+{% endif %}
 
 <h3>신호 요약</h3>
 <div class="scroll"><table>

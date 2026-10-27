@@ -116,3 +116,48 @@ def test_collect_config_from_settings():
     cfg = collect_config(Settings(_env_file=None, collect_page_size=200, collect_overlap_sec=30))
     assert cfg.page_size == 200 and cfg.overlap == timedelta(seconds=30)
     assert cfg.query == "_exists_:wazuh_rule_id OR _exists_:rule"
+
+
+class FakeTriageStep:
+    def run(self, store, now):
+        return "[판정] 대상 0 · 건너뜀 0 · 관문 없음 · LLM 요청 0 · 토큰 입력 0/출력 0/캐시 0 · LLM 꺼짐(gemini API 키 없음)"
+
+
+def test_cycle_runs_triage_last():
+    lines, failed = cycle(FakeGraylog([]), CycleStore(), CFG, W, NOW, detector=AnomalyDetector(DetectConfig()),
+                          triage=FakeTriageStep())
+    assert not failed and [line.split(" ")[0] for line in lines] == ["[수집]", "[이상]", "[상관]", "[판정]"]
+
+
+def test_triage_config_parses_whitelist_and_limits():
+    from ipaddress import ip_network
+    from app.worker import triage_config
+    cfg = triage_config(Settings(_env_file=None, whitelist_cidrs="127.0.0.1/32, 10.10.0.0/16", triage_batch=3,
+                                 max_hourly_llm_calls=7, triage_lookback_min=30))
+    assert cfg.whitelist == (ip_network("127.0.0.1/32"), ip_network("10.10.0.0/16"))
+    assert (cfg.batch_size, cfg.max_hourly, cfg.lookback) == (3, 7, timedelta(minutes=30))
+    assert cfg.max_daily == 200 and triage_config(Settings(_env_file=None)).whitelist == (ip_network("127.0.0.1/32"),)
+
+
+class RepoStore:
+    def __init__(self, rows=None):
+        from tests.test_llm_settings import FakeRepo
+        self.repo = FakeRepo()
+        for k, val in (rows or {}).items():
+            self.repo.put(k, val, False)
+
+    def settings_repo(self):
+        return self.repo
+
+
+def test_llm_route_follows_effective_config():
+    from app.llm_triage import ClaudeTriager, GeminiTriager
+    from app.worker import llm_route
+    fake = "AIza" + "ROUTEFAKE" * 4 + "q1"
+    assert llm_route(Settings(_env_file=None), RepoStore()) is None                       # 키 없음 → 규칙 판정
+    r = llm_route(Settings(_env_file=None, llm_provider="gemini", gemini_api_key=fake, gemini_model="gm"), RepoStore())
+    assert isinstance(r.triager, GeminiTriager) and (r.model, r.escalate_model) == ("gm", None)
+    r = llm_route(Settings(_env_file=None, anthropic_api_key="sk-" + "x" * 30), RepoStore())
+    assert isinstance(r.triager, ClaudeTriager) and (r.model, r.escalate_model) == ("claude-haiku-5-5", "claude-sonnet-5-5")
+    r = llm_route(Settings(_env_file=None, gemini_api_key=fake), RepoStore({"llm_provider": "gemini", "gemini_model": "ui"}))
+    assert r.model == "ui"                                                                  # 웹 UI 설정이 우선

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}AI 사용량 — mini-xdr{% endblock %}
+{% block content %}
+<h2>AI 사용량 <span class="muted">호출 깔때기 G1~G7 · 토큰 · 캐시</span></h2>
+<div class="stats">
+  <div class="stat"><span class="muted">판정 수</span><b>{{ u.decisions|num }}</b></div>
+  <div class="stat"><span class="muted">LLM 호출률(판정 대비)</span><b>{{ rates.call_rate }}</b></div>
+  <div class="stat"><span class="muted">지문 캐시 적중률(G3)</span><b>{{ rates.cache_hit }}</b></div>
+  <div class="stat"><span class="muted">프롬프트 캐시 읽기 비율</span><b>{{ rates.prompt_cache }}</b></div>
+  <div class="stat"><span class="muted">LLM 요청</span><b>{{ u.requests|num }}</b></div>
+  <div class="stat"><span class="muted">하한 적용(LLM-FLOOR)</span><b>{{ u.floored|num }}</b></div>
+</div>
+
+<h3>판정 출처 · 관문</h3>
+<div class="scroll"><table>
+  <tr><th>관문</th><th>건수</th><th>뜻</th></tr>
+  {% set meaning = {"G1": "화이트리스트", "G2": "규칙으로 결론", "G3": "지문 캐시 재사용", "G5": "예산·서킷 → 규칙",
+                    "NOKEY": "LLM 키 없음 → 규칙", "LLM": "LLM 판정", "LLM-FLOOR": "LLM 판정(규칙 하한이 이김)",
+                    "LLM-ERR": "LLM 오류·스키마 실패 → 규칙", "LLM-REFUSAL": "LLM 거절 → 규칙", "MASK-LEAK": "마스킹 누출 차단 → 규칙"} %}
+  {% for gate, n in u.by_gate|dictsort %}
+  <tr><td>{{ gate }}</td><td>{{ n|num }}</td><td>{{ meaning.get(gate, "") }}</td></tr>
+  {% else %}
+  <tr><td colspan="3" class="muted">아직 판정이 없습니다.</td></tr>
+  {% endfor %}
+</table></div>
+<p class="muted">출처별: {% for s, n in u.by_source|dictsort %}{{ source_labels.get(s, s) }} {{ n|num }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+
+<h3>LLM 호출 <span class="muted">(웹 UI 연결 테스트 제외)</span></h3>
+<div class="scroll"><table>
+  <tr><th>입력(캐시 아님)</th><th>캐시 읽기</th><th>캐시 쓰기</th><th>출력</th><th>추정 비용</th><th>상태</th><th>모델</th></tr>
+  <tr>
+    <td>{{ u.tokens_in|num }}</td><td>{{ u.cache_read|num }}</td><td>{{ u.cache_write|num }}</td><td>{{ u.tokens_out|num }}</td>
+    <td>{{ "$%.6f"|format(u.cost) if u.cost else "0 (Gemini 단가 미입력)" }}</td>
+    <td>{% for s, n in u.by_status|dictsort %}{{ s }} {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}</td>
+    <td>{% for m, n in u.by_model|dictsort %}{{ m }} {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}</td>
+  </tr>
+</table></div>
+<p class="muted">지문 캐시 {{ u.cache_rows|num }}종 · 재사용 {{ u.cache_hits|num }}회. LLM 호출률 목표는 30% 이하([186] 성공 기준).</p>
+{% endblock %}

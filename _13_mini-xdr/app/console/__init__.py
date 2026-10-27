@@ -17,6 +17,7 @@ from app.timeline import build_timeline, offset_label
 KST = timezone(timedelta(hours=9), "KST")  # 한국은 서머타임이 없어 고정 오프셋으로 충분(Windows 는 tzdata 없음)
 TIMELINE_ITEMS = 200
 SHOWN_Z = 3.0  # 행위 이상 화면에서 보여 줄 최소 z(기본 ANOMALY_Z 와 같음)
+SOURCE_LABELS = {"llm": "LLM", "cache": "지문 캐시", "rule": "규칙", "refusal": "LLM 거절 → 규칙"}
 FEATURE_LABELS = {"events": "시간당 이벤트", "signals": "신호 종류", "login_fail": "로그인 실패",
                   "ratio_404": "404 비율", "login_hour": "로그인 시각(KST)"}
 CSP = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
@@ -83,8 +84,10 @@ def create_app(open_queries, settings_deps: settings_views.SettingsDeps | None =
             if inc is None:
                 abort(404)
             summary, events, users = q.signal_summary(iid), q.incident_events(iid), q.users(iid)
+            triage = q.latest_triage(iid)
         timeline, cut = build_timeline(events, TIMELINE_ITEMS)
-        return render_template("detail.html", inc=inc, summary=summary, timeline=timeline, users=users,
+        return render_template("detail.html", inc=inc, summary=summary, timeline=timeline, users=users, triage=triage,
+                               source_labels=SOURCE_LABELS,
                                start=events[0].ts if events else None, offset_label=offset_label,
                                truncated=cut or len(events) < inc["event_count"],
                                fetch_limit=TIMELINE_FETCH, item_limit=TIMELINE_ITEMS)
@@ -97,6 +100,16 @@ def create_app(open_queries, settings_deps: settings_views.SettingsDeps | None =
             r["shown"] = sorted(((n, f) for n, f in r["features"].items() if f["z"] >= SHOWN_Z),
                                 key=lambda item: -item[1]["z"])
         return render_template("anomalies.html", rows=rows, summary=summary, labels=FEATURE_LABELS)
+
+    @app.get("/usage")
+    def usage():
+        with open_queries() as q:
+            u = q.usage_stats()
+        pct = lambda a, b: f"{a / b:.1%}" if b else "-"  # noqa: E731
+        rates = {"call_rate": pct(u["llm_decisions"], u["decisions"]),
+                 "cache_hit": pct(u["cache_decisions"], u["cache_decisions"] + u["llm_decisions"]),
+                 "prompt_cache": pct(u["cache_read"], u["tokens_in"] + u["cache_read"])}
+        return render_template("usage.html", u=u, rates=rates, source_labels=SOURCE_LABELS)
 
     @app.get("/healthz")
     def healthz():
