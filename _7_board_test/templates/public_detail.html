@@ -60,12 +60,13 @@
                 // 일치하는 UC_SEQ 항목 찾기
                 const targetItem = items.find(item => item.UC_SEQ === currentUcSeq);
 
-                document.getElementById('loading').style.display = 'none';
-
                 if (!targetItem) {
-                    document.getElementById('container').innerHTML = '<h2>해당 데이터를 찾을 수 없습니다.</h2>';
+                    // (id="container" 요소는 없다 — 로딩 문구 자리에 안내를 띄운다)
+                    document.getElementById('loading').innerHTML = '<h2>해당 데이터를 찾을 수 없습니다.</h2>';
                     return;
                 }
+
+                document.getElementById('loading').style.display = 'none';
 
                 // 데이터 바인딩 (요청하신 4가지 정보 매핑)
                 document.getElementById('postTitle').innerText = targetItem.TITLE || '제목 없음';

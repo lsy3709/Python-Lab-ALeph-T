@@ -5,24 +5,18 @@
     <title>부산 테마여행 목록</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .post-card { display: flex; align-items: center; border-bottom: 1px solid #eee; padding: 15px 0; cursor: pointer; transition: background 0.2s; }
-        .post-card:hover { background-color: #f1f3f5; }
-        .post-thumb { width: 100px; height: 75px; object-fit: cover; border-radius: 4px; margin-right: 20px; background-color: #ddd; }
-        .post-info h3 { margin: 0 0 8px 0; font-size: 18px; color: #333; }
-        .post-info p { margin: 0; color: #666; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        nav a { text-decoration: none; color: #007bff; font-weight: bold; }
-    </style>
+    <!-- ※ 직접 CSS 의 .container·body·h2 규칙은 Tailwind(.container 유틸리티·preflight 리셋)에
+         덮여 깨진다 → 다른 화면과 같이 Tailwind 클래스로만 꾸민다. -->
 </head>
-<body>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
     {% include 'partials/_nav.html' %}
-    <div class="container">
-        <h2>부산 테마여행 목록 (최대 100건)</h2>
-        <div id="loading">데이터를 불러오는 중입니다...</div>
-        <div id="postListContainer"></div>
-    </div>
+    <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+            <h2 class="text-lg font-bold mb-2">부산 테마여행 목록 (최대 100건)</h2>
+            <div id="loading" class="text-sm text-gray-400 py-6 text-center">데이터를 불러오는 중입니다...</div>
+            <div id="postListContainer" class="divide-y divide-gray-100"></div>
+        </div>
+    </main>
 
     <script>
         async function fetchPublicPosts() {
@@ -37,23 +31,23 @@
                 document.getElementById('loading').style.display = 'none';
 
                 if (items.length === 0) {
-                    container.innerHTML = '<p style="text-align:center;">조회된 데이터가 없습니다. 인증키를 확인해주세요.</p>';
+                    container.innerHTML = '<p class="text-center text-gray-400 py-6">조회된 데이터가 없습니다. 인증키를 확인해주세요.</p>';
                     return;
                 }
 
                 items.forEach(item => {
                     const card = document.createElement('div');
-                    card.className = 'post-card';
+                    card.className = 'flex items-center gap-4 py-4 px-2 cursor-pointer rounded-lg hover:bg-gray-50 transition';
                     // 클릭 시 고유 번호(UC_SEQ)를 이용해 상세 페이지로 이동
                     card.onclick = () => {
                         window.location.href = `/public-posts/${item.UC_SEQ}`;
                     };
 
                     card.innerHTML = `
-                        <img src="${item.MAIN_IMG_THUMB || ''}" alt="썸네일" class="post-thumb" onerror="this.src='https://via.placeholder.com/100x75?text=No+Image'">
-                        <div class="post-info">
-                            <h3>${item.TITLE || '제목 없음'}</h3>
-                            <p>${item.ITEMCNTNTS ? item.ITEMCNTNTS.replace(/<[^>]*>?/gm, '') : '설명이 없습니다.'}</p>
+                        <img src="${item.MAIN_IMG_THUMB || ''}" alt="썸네일" class="w-24 h-[72px] shrink-0 object-cover rounded bg-gray-200" onerror="this.src='https://via.placeholder.com/100x75?text=No+Image'">
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-semibold text-gray-800 mb-1">${item.TITLE || '제목 없음'}</h3>
+                            <p class="text-sm text-gray-500 line-clamp-2">${item.ITEMCNTNTS ? item.ITEMCNTNTS.replace(/<[^>]*>?/gm, '') : '설명이 없습니다.'}</p>
                         </div>
                     `;
                     container.appendChild(card);
