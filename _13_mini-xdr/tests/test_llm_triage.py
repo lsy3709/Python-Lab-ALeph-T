@@ -111,3 +111,12 @@ def test_claude_refusal_max_tokens_invalid_and_errors():
 
     r = claude(FakeMessages(error=AuthError(f"bad {KEY}"))).triage(SYSTEM, USER, "m")
     assert r.status == "error" and "인증 실패" in r.error and KEY not in r.error
+
+
+def test_estimate_call_cost_includes_cache_reads_and_writes():
+    from app.llm_triage import LLMResult, estimate_call_cost
+    r = LLMResult("claude", "claude-haiku-5-5", "ok", input_tokens=1000, output_tokens=200, cache_read=4000)
+    assert abs(estimate_call_cost(r) - 0.00024) < 1e-12           # (1000×0.10 + 4000×0.01 + 200×0.50) / 1M
+    w = LLMResult("claude", "claude-haiku-5-5", "ok", cache_write=4000)
+    assert abs(estimate_call_cost(w, "1h") - 0.0008) < 1e-12      # 1시간 TTL 쓰기는 입력가의 2배
+    assert estimate_call_cost(LLMResult("gemini", "gemini-3.5-flash-lite", "ok", input_tokens=9999)) == 0.0

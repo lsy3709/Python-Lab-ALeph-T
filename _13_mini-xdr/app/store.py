@@ -192,6 +192,121 @@ class MySQLStore:
                         (a.entity_type, a.entity[:128], _naive_utc(a.last_ts), round(score.max_z, 3),
                          json.dumps(feats, ensure_ascii=False)))
 
+    # ── 트리아지 ───────────────────────────────────────
+    def settings_repo(self):
+        """웹 UI 설정(app_settings) — 워커가 매 주기 공급자·모델·키를 다시 읽는다."""
+        from app.settings_store import MySQLSettingsRepo
+
+        return MySQLSettingsRepo(self._conn)
+
+    def triage_candidates(self, since: datetime | None, limit: int | None) -> list[dict]:
+        """limit 이 있으면 최근 N건, 없으면 열린 인시던트 + 마지막 이벤트가 since 이후인 것."""
+        cols = ("id, entity_key, status, opened_at, last_event_at, layers, event_count, max_level, fingerprint, "
+                "rule_floor, current_priority, last_triaged_at, material_state")
+        with self._conn.cursor(pymysql.cursors.DictCursor) as cur:
+            if limit:
+                cur.execute(f"SELECT {cols} FROM incidents ORDER BY last_event_at DESC LIMIT %s", (limit,))
+            else:
+                cur.execute(f"SELECT {cols} FROM incidents WHERE status = 'open' OR last_event_at >= %s "
+                            "ORDER BY last_event_at", (_naive_utc(since),))
+            rows = list(cur.fetchall())
+        for r in rows:
+            r["layers"] = json.loads(r["layers"])
+            r["material_state"] = json.loads(r["material_state"]) if r["material_state"] else None
+            for k in ("opened_at", "last_event_at", "last_triaged_at"):
+                r[k] = _aware(r[k])
+        return rows
+
+    def card_inputs(self, incident_id: int, events_limit: int = 2000) -> dict:
+        join = "FROM incident_events ie JOIN events_norm e ON e.id = ie.event_id WHERE ie.incident_id = %s"
+        with self._conn.cursor(pymysql.cursors.DictCursor) as cur:
+            cur.execute("SELECT e.layer, e.source, COALESCE(e.rule_id, e.event_type) AS sig, COUNT(*) AS n, "
+                        f"MAX(e.level) AS max_level, MAX(e.mitre) AS mitre {join} GROUP BY e.layer, e.source, sig",
+                        (incident_id,))
+            summary = list(cur.fetchall())
+            cur.execute(f"SELECT DISTINCT e.user_name AS u {join} AND e.user_name IS NOT NULL "
+                        "AND e.user_name <> '(unknown)' LIMIT 10", (incident_id,))
+            users = [r["u"] for r in cur.fetchall()]
+            cur.execute("SELECT entity_key, opened_at, last_event_at FROM incidents WHERE id = %s", (incident_id,))
+            inc = cur.fetchone()
+        with self._conn.cursor() as cur:
+            cur.execute(f"SELECT {EVENT_COLUMNS} {join} ORDER BY e.ts, e.id LIMIT %s", (incident_id, events_limit))
+            events = [event_from_row(r) for r in cur.fetchall()]
+            anomalies = []
+            etype, entity = inc["entity_key"].split(":", 1)
+            if etype in ("ip", "user"):  # 이 엔티티의 이상 점수 중 인시던트 기간(앞뒤 1시간) 안의 것
+                cur.execute("SELECT features FROM anomaly_scores WHERE entity_type = %s AND entity = %s "
+                            "AND ts BETWEEN %s - INTERVAL 1 HOUR AND %s + INTERVAL 1 HOUR ORDER BY score DESC LIMIT 5",
+                            (etype, entity, inc["opened_at"], inc["last_event_at"]))
+                anomalies = [{"features": json.loads(r[0])} for r in cur.fetchall()]
+        return {"summary": summary, "events": events, "anomalies": anomalies, "users": users,
+                "signals": [s["sig"] for s in summary]}
+
+    def get_cached_verdict(self, fingerprint: str, now: datetime) -> dict | None:
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT verdict, model FROM verdict_cache WHERE fingerprint = %s AND expires_at > %s",
+                        (fingerprint, _naive_utc(now)))
+            row = cur.fetchone()
+        return {**json.loads(row[0]), "model": row[1]} if row else None
+
+    def hit_cached_verdict(self, fingerprint: str) -> None:
+        with self._conn.cursor() as cur:
+            cur.execute("UPDATE verdict_cache SET hits = hits + 1 WHERE fingerprint = %s", (fingerprint,))
+
+    def put_cached_verdict(self, fingerprint: str, verdict: dict, model: str, expires_at: datetime) -> None:
+        with self._conn.cursor() as cur:
+            cur.execute("INSERT INTO verdict_cache (fingerprint, verdict, model, expires_at) VALUES (%s, %s, %s, %s) AS new "
+                        "ON DUPLICATE KEY UPDATE verdict = new.verdict, model = new.model, expires_at = new.expires_at",
+                        (fingerprint, json.dumps(verdict, ensure_ascii=False), model[:64], _naive_utc(expires_at)))
+
+    def llm_usage(self, now: datetime) -> dict:
+        """트리아지 호출 수(일·시간)와 최근 10분 연속 오류 수 — 연결 테스트(connection_test)는 예산에서 뺀다."""
+        n = _naive_utc(now)
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT SUM(ts >= %s - INTERVAL 1 DAY), SUM(ts >= %s - INTERVAL 1 HOUR) FROM llm_calls "
+                        "WHERE gate_reason <> 'connection_test'", (n, n))
+            day, hour = cur.fetchone()
+            cur.execute("SELECT status FROM llm_calls WHERE gate_reason <> 'connection_test' "
+                        "AND ts >= %s - INTERVAL 10 MINUTE ORDER BY id DESC LIMIT 10", (n,))
+            recent = [r[0] for r in cur.fetchall()]
+        errors = 0
+        for status in recent:
+            if status != "error":
+                break
+            errors += 1
+        return {"day": int(day or 0), "hour": int(hour or 0), "recent_errors": errors}
+
+    def record_llm_call(self, result, incidents_in_batch: int, gate_reason: str, cache_ttl: str = "5m") -> None:
+        from app.llm_triage import estimate_call_cost
+
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO llm_calls (provider, model, incidents_in_batch, input_tokens, output_tokens, cache_read_tokens, "
+                "cache_write_tokens, cost_usd_est, latency_ms, status, gate_reason) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (result.provider, result.model[:64], incidents_in_batch, result.input_tokens, result.output_tokens,
+                 result.cache_read, result.cache_write, estimate_call_cost(result, cache_ttl), result.latency_ms,
+                 result.status, gate_reason[:64]))
+
+    def save_decision(self, inc: dict, decision, material: dict, now: datetime) -> None:
+        """판정 이력 1행 + 인시던트의 현재 우선순위·마지막 판정 시각·실질 상태를 한 트랜잭션으로."""
+        d = decision
+        self._conn.begin()
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO triage_results (incident_id, source, gate, model, priority, verdict, "
+                    "false_positive_likelihood, reasoning_ko, recommended_playbook, confidence) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (inc["id"], d.source, d.gate[:16], (d.model or None) and d.model[:64], d.priority, d.verdict,
+                     d.false_positive_likelihood, d.reasoning_ko[:600], d.recommended_playbook, d.confidence))
+                cur.execute("UPDATE incidents SET current_priority = %s, last_triaged_at = %s, material_state = %s "
+                            "WHERE id = %s", (d.priority, _naive_utc(now), json.dumps(material), inc["id"]))
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+
     def close_stale(self, before: datetime) -> int:
         """마지막 이벤트가 before 보다 이른 열린 인시던트를 닫는다."""
         with self._conn.cursor() as cur:

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 import httpx
 from pydantic import ValidationError
 
-from app.llm_probe import GEMINI_BASE, MODEL_ID_RE, _clean, _gemini_error, _sdk_error
+from app.llm_probe import CLAUDE_PRICES, GEMINI_BASE, MODEL_ID_RE, _clean, _gemini_error, _sdk_error
 from app.triage_schema import GEMINI_SCHEMA, TriageBatch, Verdict, normalize
 
 MAX_OUTPUT_TOKENS = 2048       # 묶음 5건 × 근거 3문장을 넉넉히 — 잘림은 status=max_tokens 로 확인
@@ -33,6 +33,17 @@ class LLMResult:
     latency_ms: int | None = None
     error: str | None = None
     refusal_category: str | None = None
+
+
+def estimate_call_cost(r: LLMResult, cache_ttl: str = "5m") -> float:
+    """Claude 단가(claude-api 레퍼런스): 캐시 읽기는 입력가의 0.1배, 쓰기는 1.25배(5분)·2배(1시간). Gemini 는 0(단가 미입력)."""
+    price = CLAUDE_PRICES.get(r.model) if r.provider == "claude" else None
+    if not price:
+        return 0.0
+    p_in, p_out = price
+    write = 2.0 if cache_ttl == "1h" else 1.25
+    return (r.input_tokens * p_in + r.cache_read * p_in * 0.1 + r.cache_write * p_in * write
+            + r.output_tokens * p_out) / 1_000_000
 
 
 def _verdicts(batch: TriageBatch) -> dict[str, Verdict]:
