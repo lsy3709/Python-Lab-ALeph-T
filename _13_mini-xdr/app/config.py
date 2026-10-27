@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     # 웹 UI 에서 저장하는 AI 키를 암호화하는 열쇠(Fernet). 없으면 웹 UI 키 저장이 막힌다.
     settings_secret_key: SecretStr | None = None
 
+    # 랩 연동 점검(PC 에서 python -m app.lab_check · python -m app.lab_s6)
+    board_url: str = "http://127.0.0.1:5000"
+    board_api_key: SecretStr | None = None   # 게시판 SECURITY_API_KEY 와 같은 값 — 차단·티켓 조회와 S6 원복에 쓴다(없으면 그 항목만 건너뜀)
+    board_db: str = "my_new_board_db"
+    n8n_url: str = "http://127.0.0.1:5678"
+    zabbix_url: str = "http://127.0.0.1:8081/api_jsonrpc.php"
+    zabbix_user: str | None = None
+    zabbix_password: SecretStr | None = None
+
     def secret_key_value(self) -> str | None:
         """자리표시자가 아닌 열쇠 값 — 없으면 None."""
         return self.settings_secret_key.get_secret_value().strip() if _has(self.settings_secret_key) else None
