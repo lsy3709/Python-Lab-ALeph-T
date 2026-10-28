@@ -3,6 +3,8 @@
 인증: 헤더 X-API-Key (사람이 아니라 봇이 부르므로 로그인 대신 공유 비밀 1개)
 """
 import os
+from collections import Counter
+from datetime import datetime, time, timedelta
 from functools import wraps
 
 from flask import Blueprint, current_app, jsonify, request
@@ -167,6 +169,57 @@ def security_events_summary():
       'student': student,
       'by_decision': by_decision,
       'top_deny_ips': [{'src_ip': ip, 'fails': int(n)} for ip, n in top],
+  })
+
+
+_SEVERITIES = ('Low', 'Medium', 'High', 'Critical')   # 그래프 쌓는 순서(아래 → 위)
+_STATS_DAYS = (7, 14, 30, 90)
+
+
+def _norm_severity(value):
+  """대소문자만 다른 등급은 합치고, 목록에 없는 등급은 'Other' 로 따로 센다(아무 칸에나 섞지 않는다)."""
+  for s in _SEVERITIES:
+    if (value or '').strip().lower() == s.lower():
+      return s
+  return 'Other'
+
+
+@security_bp.route('/stats', methods=['GET'])
+def security_stats():
+  """대시보드 그래프용 집계 — 최근 N일 날짜별·심각도별 이벤트 수, 심각도·출처 분포.
+
+  조회 전용·키 없음(요약 API 와 같은 수준). 날짜는 created_at(이 PC 시각 = KST) 으로 묶는다.
+  필터: ?student= · ?days=7|14|30|90 (기본 30, 허용 밖이면 30)
+  """
+  student = request.args.get('student')
+  days = request.args.get('days', 30, type=int)
+  days = days if days in _STATS_DAYS else 30
+  today = datetime.now().date()
+  start = today - timedelta(days=days - 1)
+
+  query = (db.session.query(SecurityEvent.created_at, SecurityEvent.severity, SecurityEvent.source)
+           .filter(SecurityEvent.created_at >= datetime.combine(start, time.min)))
+  if student:
+    query = query.filter(SecurityEvent.student == student)
+
+  slot = {start + timedelta(days=i): i for i in range(days)}
+  daily = {s: [0] * days for s in _SEVERITIES}
+  by_source = Counter()
+  for created_at, severity, source in query.all():
+    i = slot.get(created_at.date())
+    if i is None:          # 미래 시각(시계 차이) 등 — 칸이 없으면 뺀다
+      continue
+    daily.setdefault(_norm_severity(severity), [0] * days)[i] += 1
+    by_source[source or '(없음)'] += 1
+
+  by_severity = {s: sum(v) for s, v in daily.items()}
+  return jsonify({
+      'student': student, 'days': days, 'start': start.isoformat(), 'end': today.isoformat(),
+      'labels': [d.strftime('%m-%d') for d in slot],
+      'daily': daily, 'by_severity': by_severity,
+      'by_source': [{'source': s, 'n': n}
+                    for s, n in sorted(by_source.items(), key=lambda kv: (-kv[1], kv[0]))],
+      'total': sum(by_severity.values()),
   })
 
 

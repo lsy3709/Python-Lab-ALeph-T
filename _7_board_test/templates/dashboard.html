@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>보안 대시보드 — 로그인 경보</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 그래프: Chart.js 4.4.1(버전 고정). 인터넷이 없으면 그래프 자리에 안내가 뜨고 표 보기는 그대로 동작한다 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
 
@@ -49,10 +51,39 @@
       </div>
     </div>
 
-    <!-- 거부 상위 IP -->
+    <!-- 그래프 — 학생 필터를 따라간다. 막대·조각에 마우스를 올리면 숫자가 보인다 -->
     <section class="bg-white rounded-xl shadow-sm p-4 mb-6">
-      <h3 class="font-semibold mb-3">거부 상위 IP</h3>
-      <div id="top-ips" class="space-y-2 text-sm text-gray-500">불러오는 중…</div>
+      <div class="flex items-baseline justify-between flex-wrap gap-2 mb-2">
+        <h3 class="font-semibold">📈 일별 이벤트 추이
+          <span class="text-xs text-gray-400 font-normal">최근 <span id="trend-days">30</span>일 · 심각도별 누적</span></h3>
+        <span id="trend-total" class="text-xs text-gray-500"></span>
+      </div>
+      <div class="relative h-64"><canvas id="chart-trend" role="img" aria-label="최근 30일 날짜별 이벤트 수(심각도별 누적 막대)"></canvas></div>
+      <details class="mt-2 text-xs text-gray-500"><summary class="cursor-pointer">표로 보기</summary>
+        <div id="trend-table" class="overflow-x-auto mt-2"></div></details>
+    </section>
+
+    <div class="grid lg:grid-cols-2 gap-6 mb-6">
+      <section class="bg-white rounded-xl shadow-sm p-4">
+        <h3 class="font-semibold mb-2">심각도 분포 <span class="text-xs text-gray-400 font-normal">같은 기간</span></h3>
+        <div class="relative h-56"><canvas id="chart-severity" role="img" aria-label="심각도별 이벤트 비율(도넛)"></canvas></div>
+        <details class="mt-2 text-xs text-gray-500"><summary class="cursor-pointer">표로 보기</summary>
+          <div id="severity-table" class="mt-2"></div></details>
+      </section>
+      <section class="bg-white rounded-xl shadow-sm p-4">
+        <h3 class="font-semibold mb-2">출처별 이벤트 <span class="text-xs text-gray-400 font-normal">어느 탐지가 보냈나</span></h3>
+        <div class="relative h-56"><canvas id="chart-source" role="img" aria-label="출처별 이벤트 수(가로 막대)"></canvas></div>
+        <details class="mt-2 text-xs text-gray-500"><summary class="cursor-pointer">표로 보기</summary>
+          <div id="source-table" class="mt-2"></div></details>
+      </section>
+    </div>
+
+    <!-- 거부 상위 IP (실패 횟수 합) -->
+    <section class="bg-white rounded-xl shadow-sm p-4 mb-6">
+      <h3 class="font-semibold mb-2">거부 상위 IP <span class="text-xs text-gray-400 font-normal">거부 기록의 실패 횟수 합 · 전체 기간</span></h3>
+      <div class="relative h-56"><canvas id="chart-top-ips" role="img" aria-label="거부 상위 IP 5개(가로 막대)"></canvas></div>
+      <details class="mt-2 text-xs text-gray-500"><summary class="cursor-pointer">표로 보기</summary>
+        <div id="top-ips" class="space-y-1 mt-2">불러오는 중…</div></details>
     </section>
 
     <!-- 인시던트 티켓 (여러 이벤트를 한 사건으로 묶은 것) -->
@@ -178,6 +209,7 @@
 
     <p class="text-xs text-gray-400 mt-4">
       데이터 출처: <code>GET /api/security/events</code> · <code>GET /api/security/events/summary</code>
+      · <code>GET /api/security/stats</code>(그래프)
       · <code>GET /api/security/incidents</code> · <code>GET /api/security/incidents/summary</code>
       — n8n 워크플로우가 <code>POST /api/security/events</code> 로 저장한 기록입니다.
     </p>
@@ -236,15 +268,118 @@
       const tops = d.top_deny_ips || [];
       document.getElementById('stat-top-ip').textContent = tops.length ? tops[0].src_ip : '-';
       document.getElementById('top-ips').innerHTML = tops.length
-        ? tops.map(t => `
-            <div class="flex items-center gap-3">
-              <span class="font-mono text-gray-800 w-36 shrink-0">${esc(t.src_ip)}</span>
-              <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                <div class="bg-red-500 h-2" style="width:${Math.min(100, (t.fails / tops[0].fails) * 100)}%"></div>
-              </div>
-              <span class="text-gray-600 w-16 text-right">${t.fails}회</span>
-            </div>`).join('')
+        ? miniTable(['IP', '실패 횟수 합'], tops.map(t => [t.src_ip, t.fails.toLocaleString() + '회']))
         : '<div class="text-gray-400">거부 기록이 없습니다.</div>';
+      hbarChart('chart-top-ips', tops.map(t => t.src_ip), tops.map(t => t.fails), '회');
+    }
+
+    /* ── 그래프(Chart.js) ─────────────────────────────────────────────
+       색은 dataviz 검증기를 통과한 것만 쓴다.
+       · 심각도 = 빨강 한 가지 색의 4단계(진할수록 심각, 흰 바탕 대비 2:1 이상)
+       · 출처·IP 막대 = 파랑 한 색(한 계열이라 범례 없이 축 글자가 이름을 말한다)
+       글자(축·범례·툴팁)는 글자색 회색, 색은 막대에만 쓴다. */
+    const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];          // 아래 → 위 쌓는 순서
+    const SEV_COLOR = { Low: '#f6a08f', Medium: '#e8665a', High: '#c93a36', Critical: '#8e1f1f', Other: '#9ca3af' };
+    const BAR = '#2a78d6';
+    const AXIS = { color: '#6b7280', font: { size: 11 } };
+    const GRID = { color: '#eef0f3' };
+    const charts = {};
+
+    function draw(id, config) {
+      if (charts[id]) charts[id].destroy();          // 필터를 바꾸면 새로 그린다(색은 등급을 따라가 그대로)
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (!window.Chart) {                            // CDN 을 못 받은 경우 — 표 보기는 그대로 쓸 수 있다
+        canvas.parentElement.innerHTML = '<p class="text-sm text-gray-400 pt-10 text-center">그래프 라이브러리를 불러오지 못했습니다(인터넷 연결 확인). 아래 「표로 보기」를 쓰세요.</p>';
+        return;
+      }
+      charts[id] = new Chart(canvas, config);
+    }
+
+    function miniTable(head, rows) {
+      return '<table class="text-xs w-full"><thead><tr>' +
+        head.map(h => `<th class="text-left font-medium py-1 pr-3">${esc(h)}</th>`).join('') +
+        '</tr></thead><tbody>' +
+        rows.map(r => '<tr class="border-t border-gray-100">' + r.map(c => `<td class="py-1 pr-3">${esc(c)}</td>`).join('') + '</tr>').join('') +
+        '</tbody></table>';
+    }
+
+    function hbarChart(id, labels, values, unit) {
+      draw(id, {
+        type: 'bar',
+        data: { labels, datasets: [{ data: values, backgroundColor: BAR, borderRadius: 4, borderSkipped: 'start',
+                                     barPercentage: 0.7, categoryPercentage: 0.9 }] },
+        options: {
+          indexAxis: 'y', maintainAspectRatio: false, animation: false,
+          plugins: { legend: { display: false },
+                     tooltip: { callbacks: { label: c => ` ${c.parsed.x.toLocaleString()}${unit}` } } },
+          scales: { x: { beginAtZero: true, ticks: { ...AXIS, precision: 0 }, grid: GRID },
+                    y: { ticks: { ...AXIS, color: '#374151' }, grid: { display: false } } },
+        },
+      });
+    }
+
+    async function loadStats() {
+      const qs = studentParam();
+      const r = await fetch('/api/security/stats' + (qs ? '?' + qs : ''));
+      const d = await r.json();
+      const keys = SEVERITIES.concat(d.daily.Other ? ['Other'] : []);
+      document.getElementById('trend-days').textContent = d.days;
+      document.getElementById('trend-total').textContent = `기간 합계 ${d.total.toLocaleString()}건`;
+
+      // 위쪽 끝(그날 0 이 아닌 가장 위 조각)만 둥글게 — 누적 막대 중간 조각까지 둥글면 조각이 떠 보인다
+      const isTop = (di, i) => keys.slice(di + 1).every(k => !d.daily[k][i]);
+      draw('chart-trend', {
+        type: 'bar',
+        data: { labels: d.labels, datasets: keys.map((k, di) => ({
+          label: k, data: d.daily[k], backgroundColor: SEV_COLOR[k], stack: 'sev',
+          borderColor: '#ffffff', borderWidth: { top: 2 }, borderSkipped: 'start',   // 조각 사이 2px 흰 틈
+          borderRadius: c => isTop(di, c.dataIndex) ? { topLeft: 4, topRight: 4 } : 0,
+          barPercentage: 0.8, categoryPercentage: 0.9 })) },
+        options: {
+          maintainAspectRatio: false, animation: false,
+          interaction: { mode: 'index', intersect: false },     // 그날 막대 어디에 올려도 등급별 숫자를 한 번에
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, color: '#4b5563' } },
+            tooltip: { filter: c => c.parsed.y > 0,
+                       callbacks: { footer: items => '합계 ' + items.reduce((a, c) => a + c.parsed.y, 0) + '건' } },
+          },
+          scales: { x: { stacked: true, ticks: { ...AXIS, maxRotation: 0, autoSkipPadding: 12 }, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, ticks: { ...AXIS, precision: 0 }, grid: GRID } },
+        },
+      });
+      document.getElementById('trend-table').innerHTML = miniTable(['날짜', ...keys, '합계'],
+        d.labels.map((lab, i) => [lab, ...keys.map(k => d.daily[k][i]),
+                                  keys.reduce((a, k) => a + d.daily[k][i], 0)]).reverse());
+
+      const sevKeys = keys.filter(k => d.by_severity[k] > 0);
+      draw('chart-severity', {
+        type: 'doughnut',
+        data: { labels: sevKeys, datasets: [{ data: sevKeys.map(k => d.by_severity[k]),
+                                              backgroundColor: sevKeys.map(k => SEV_COLOR[k]),
+                                              borderColor: '#ffffff', borderWidth: 2 }] },
+        options: {
+          maintainAspectRatio: false, animation: false, cutout: '58%',
+          plugins: {
+            legend: { display: sevKeys.length > 0, position: 'right',
+              labels: { boxWidth: 10, boxHeight: 10, color: '#4b5563',
+                generateLabels: ch => ch.data.labels.map((lab, i) => ({
+                  text: `${lab}  ${ch.data.datasets[0].data[i].toLocaleString()}건`,
+                  fillStyle: SEV_COLOR[lab], strokeStyle: SEV_COLOR[lab], fontColor: '#4b5563', index: i })) } },
+            tooltip: { callbacks: { label: c => ` ${c.label} ${c.parsed.toLocaleString()}건 (${Math.round(c.parsed / d.total * 100)}%)` } },
+          },
+        },
+      });
+      document.getElementById('severity-table').innerHTML = miniTable(['심각도', '건수', '비율'],
+        keys.map(k => [k, d.by_severity[k], d.total ? Math.round(d.by_severity[k] / d.total * 100) + '%' : '-']));
+
+      const src = d.by_source.slice(0, 7);                      // 8번째부터는 '기타'로 접는다
+      const rest = d.by_source.slice(7).reduce((a, s) => a + s.n, 0);
+      if (rest) src.push({ source: '기타', n: rest });
+      hbarChart('chart-source', src.map(s => s.source), src.map(s => s.n), '건');
+      document.getElementById('source-table').innerHTML = d.by_source.length
+        ? miniTable(['출처', '건수'], d.by_source.map(s => [s.source, s.n]))
+        : '<div class="text-gray-400">기록이 없습니다.</div>';
     }
 
     async function loadEvents() {
@@ -442,7 +577,7 @@
     function reload() {
       evState.page = 1;
       incState.page = 1;
-      loadSummary(); loadEvents(); loadIncidentSummary(); loadIncidents();
+      loadSummary(); loadStats(); loadEvents(); loadIncidentSummary(); loadIncidents();
     }
 
     document.getElementById('refresh-btn').addEventListener('click', () => { loadStudents(); reload(); });
