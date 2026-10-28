@@ -1,6 +1,6 @@
 """읽기 전용 콘솔 — 가짜 조회 객체로 화면·필터·이스케이프·보안 헤더를 확인한다."""
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -71,6 +71,27 @@ class FakeQueries:
                                 "updated_at": T0}],
                 "individual": [{"entity_type": "ip", "entity": "192.168.120.1", "features": 4}], "insufficient": 7}
 
+    since = None
+    daily = [{"day": date(2026, 10, 25), "layer": "app", "n": 120}, {"day": date(2026, 10, 26), "layer": "app", "n": 80},
+             {"day": date(2026, 10, 26), "layer": "host", "n": 30}]
+    priorities = [{"priority": "P1", "status": "closed", "n": 4}, {"priority": "P4", "status": "open", "n": 9},
+                  {"priority": None, "status": "open", "n": 2}]
+    entities = [{"entity_key": "ip:203.0.113.9", "events": 1500, "incidents": 3}]
+    gates = {"G3": 19, "LLM": 13, "NOKEY": 3}
+
+    def daily_layer_counts(self, since):
+        self.since = since
+        return self.daily
+
+    def priority_counts(self, since):
+        return self.priorities
+
+    def top_entities(self, since, limit=10):
+        return self.entities
+
+    def gate_counts(self, since):
+        return self.gates
+
     anomalies = [{"id": 1, "entity_type": "ip", "entity": "203.0.113.50", "ts": T0, "score": 126.8,
                   "features": {"events": {"value": 200, "z": 126.8, "kind": "population", "center": 12, "scale": 1.48},
                                "signals": {"value": 1, "z": 0.0, "kind": "population", "center": 1, "scale": 1.0}}}]
@@ -81,6 +102,9 @@ def fake():
     return FakeQueries()
 
 
+NOW = datetime(2026, 10, 26, 6, 0, tzinfo=timezone.utc)  # KST 10-26 15:00
+
+
 def client_for(fake, fail=False):
     @contextmanager
     def opener():
@@ -88,7 +112,7 @@ def client_for(fake, fail=False):
             raise ConnectionError("db down 10.0.0.5")
         yield fake
 
-    return create_app(opener).test_client()
+    return create_app(opener, now=lambda: NOW).test_client()
 
 
 def test_list_shows_priority_entity_layers_stats_in_kst(fake):
@@ -173,3 +197,36 @@ def test_usage_page(fake):
     for text in ("LLM 호출률", "25.0%", "지문 캐시 적중률", "33.3%", "프롬프트 캐시", "40.0%", "하한 적용", "LLM-FLOOR"):
         assert text in html, text
     assert 'href="/usage"' in client_for(fake).get("/").get_data(as_text=True)
+
+
+def test_dashboard_draws_four_server_side_charts_without_script(fake):
+    r = client_for(fake).get("/dashboard")
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and html.count("<svg") == 4 and "<script" not in html
+    assert "default-src 'none'" in r.headers["Content-Security-Policy"]       # CSP 를 풀지 않았다
+    assert "<title>10-26 · 합계 110건 — app 80 · host 30</title>" in html    # 일별 누적 툴팁
+    assert "ip:203.0.113.9" in html and "1.5K" in html                        # 상위 엔티티
+    assert "미정" in html and "G3" in html                                     # 우선순위 미판정·관문
+    assert "표로 보기" in html                                                 # 표 보기(그래프 대체)
+    assert 'href="/dashboard"' in client_for(fake).get("/").get_data(as_text=True)
+
+
+def test_dashboard_period_is_whitelisted_and_starts_at_kst_midnight(fake):
+    client_for(fake).get("/dashboard?days=7")
+    assert fake.since == datetime(2026, 10, 19, 15, 0)    # KST 10-20 00:00 = UTC 10-19 15:00 (7일: 10-20~10-26)
+    client_for(fake).get("/dashboard?days=999")
+    assert fake.since == datetime(2026, 10, 12, 15, 0)    # 허용 밖이면 기본 14일
+    html = client_for(fake).get("/dashboard?days=30").get_data(as_text=True)
+    assert "10-26" in html and "09-27" in html            # 빈 날도 축에 포함(30일: 09-27~10-26)
+
+
+def test_dashboard_escapes_entities(fake):
+    fake.entities = [{"entity_key": f"user:{XSS}", "events": 5, "incidents": 1}]
+    html = client_for(fake).get("/dashboard").get_data(as_text=True)
+    assert XSS not in html and "&lt;script&gt;" in html
+
+
+def test_dashboard_empty_period(fake):
+    fake.daily, fake.priorities, fake.entities, fake.gates = [], [], [], {}
+    html = client_for(fake).get("/dashboard").get_data(as_text=True)
+    assert html.count("데이터가 없습니다") == 4

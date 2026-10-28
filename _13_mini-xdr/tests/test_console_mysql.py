@@ -1,4 +1,6 @@
-"""콘솔 조회 — 실제 스키마에서 목록·상세를 읽고, 읽기 전용 세션이 쓰기를 거부하는지 확인한다."""
+"""콘솔 조회 — 실제 스키마에서 목록·상세·대시보드 집계를 읽고, 읽기 전용 세션이 쓰기를 거부하는지 확인한다."""
+from datetime import date, datetime
+
 import pymysql
 import pytest
 
@@ -42,6 +44,26 @@ def test_detail_queries(queries):
     assert queries.get_incident(99999) is None
     s = queries.stats()
     assert (s["events"], s["incidents"], s["multi_layer"], s["backlog"]) == (5, 4, 1, 0)
+
+
+def test_dashboard_queries(queries, fresh_db):
+    since = datetime(2026, 10, 25, 15, 0)   # KST 10-26 00:00 — 시드 이벤트는 UTC 05:00~05:30(KST 14시대)
+    daily = {(r["day"], r["layer"]): r["n"] for r in queries.daily_layer_counts(since)}
+    assert daily == {(date(2026, 10, 26), "app"): 3, (date(2026, 10, 26), "network"): 1,
+                     (date(2026, 10, 26), "host"): 1}
+    assert queries.daily_layer_counts(datetime(2026, 10, 27, 0, 0)) == []        # 기간 밖
+    pr = queries.priority_counts(since)
+    assert sum(r["n"] for r in pr) == 4 and any(r["priority"] == "P1" for r in pr)
+    top = queries.top_entities(since)
+    assert (top[0]["entity_key"], top[0]["events"], top[0]["incidents"]) == ("ip:203.0.113.9", 3, 2)
+    assert queries.gate_counts(since) == {}
+    conn = pymysql.connect(host="127.0.0.1", port=fresh_db["port"], user="root", password=ROOT_PW,
+                           database=fresh_db["name"], autocommit=True)
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO triage_results (incident_id, source, gate, priority, verdict, created_at) "
+                    "SELECT MIN(id), 'cache', 'G3', 'P3', 'benign', '2026-10-26 06:00:00' FROM incidents")
+    conn.close()
+    assert queries.gate_counts(since) == {"G3": 1}
 
 
 def test_anomaly_queries(fresh_db):

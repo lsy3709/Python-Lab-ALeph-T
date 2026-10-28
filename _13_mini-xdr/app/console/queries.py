@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 
 import pymysql
 from pymysql.cursors import DictCursor
@@ -133,6 +134,28 @@ class ConsoleQueries:
                                    "WHERE entity <> '*' GROUP BY entity_type, entity HAVING MAX(n) < %s) t",
                                    (min_samples,))[0]["n"]
         return {"population": population, "individual": individual, "insufficient": insufficient}
+
+    # ── 대시보드 집계 — since 는 naive UTC(KST 자정을 바꾼 값), 날짜는 KST 로 묶는다 ──
+    def daily_layer_counts(self, since: datetime) -> list[dict]:
+        return self._dicts("SELECT DATE(ts + INTERVAL 9 HOUR) AS day, layer, COUNT(*) AS n FROM events_norm "
+                           "WHERE ts >= %s GROUP BY day, layer ORDER BY day", (since,))
+
+    def priority_counts(self, since: datetime) -> list[dict]:
+        return self._dicts("SELECT current_priority AS priority, status, COUNT(*) AS n FROM incidents "
+                           "WHERE last_event_at >= %s GROUP BY current_priority, status", (since,))
+
+    def top_entities(self, since: datetime, limit: int = 10) -> list[dict]:
+        """기간 안에 활동한 인시던트를 엔티티별로 — 이벤트 수(인시던트 전체)가 많은 순."""
+        rows = self._dicts("SELECT entity_key, SUM(event_count) AS events, COUNT(*) AS incidents FROM incidents "
+                           "WHERE last_event_at >= %s GROUP BY entity_key ORDER BY events DESC, entity_key LIMIT %s",
+                           (since, limit))
+        for r in rows:
+            r["events"] = int(r["events"])
+        return rows
+
+    def gate_counts(self, since: datetime) -> dict[str, int]:
+        return {r["gate"]: r["n"] for r in self._dicts(
+            "SELECT gate, COUNT(*) AS n FROM triage_results WHERE created_at >= %s GROUP BY gate", (since,))}
 
     def stats(self) -> dict:
         s = self._dicts(

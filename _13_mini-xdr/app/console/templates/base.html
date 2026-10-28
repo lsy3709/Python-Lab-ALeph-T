@@ -44,12 +44,34 @@
   .card form.panel { margin:6px 0; }
   form.inline { display:inline; }
   .bad-text { color:#e74c3c; }
+  /* 대시보드 그래프(서버 SVG) — 글자는 글자색, 색은 막대에만 */
+  .dash-head { display:flex; gap:12px; align-items:baseline; justify-content:space-between; flex-wrap:wrap; }
+  .period { color:var(--muted); font-size:12px; }
+  .period a { margin-left:8px; padding:2px 10px; border:1px solid var(--line); border-radius:10px; }
+  .period a.on { border-color:var(--accent); color:var(--text); }
+  .card h3 { margin:0; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(460px, 1fr)); gap:0 12px; }
+  .viz { width:100%; height:auto; display:block; margin-top:4px; }
+  .viz text { fill:var(--muted); font-size:11px; font-family:inherit; }
+  .viz text.y { text-anchor:end; } .viz text.x { text-anchor:middle; }
+  .viz text.label { text-anchor:end; fill:var(--text); font-size:12px; }
+  .viz text.value { fill:var(--text); font-size:12px; }
+  .viz .grid { stroke:var(--line); stroke-width:1; }
+  .viz .axis { stroke:#3a4a5c; stroke-width:1; }
+  .viz .hit { fill:transparent; }
+  .viz .col:hover .hit, .viz .bar:hover .hit { fill:rgba(255,255,255,.05); }
+  .viz .col:hover .mark, .viz .bar:hover .mark { filter:brightness(1.18); }
+  .viz-empty { padding:28px 0; text-align:center; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin:6px 0 2px; }
+  .legend .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+  details summary { cursor:pointer; color:var(--muted); font-size:12px; margin-top:8px; }
+  details table { margin-top:6px; }
 </style>
 </head>
 <body>
 <header>
   <h1><a href="/">mini-xdr 콘솔</a></h1>
-  <nav><a href="/">인시던트</a><a href="/anomalies">행위 이상</a><a href="/usage">AI 사용량</a>{% if settings_enabled %}<a href="/settings">AI 설정</a>{% endif %}</nav>
+  <nav><a href="/dashboard">대시보드</a><a href="/">인시던트</a><a href="/anomalies">행위 이상</a><a href="/usage">AI 사용량</a>{% if settings_enabled %}<a href="/settings">AI 설정</a>{% endif %}</nav>
   <span class="muted">사건 조회는 읽기 전용 · 시각은 KST · 개념 학습·대체 실습(SKT 사전 싱크 필요)</span>
   {% if ai_status %}
   {% if not ai_status.reason %}<a class="ai-status on" href="/settings">AI: {{ ai_status.provider }} · {{ ai_status.model }}</a>

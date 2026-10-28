@@ -14,11 +14,8 @@
 <h3>판정 출처 · 관문</h3>
 <div class="scroll"><table>
   <tr><th>관문</th><th>건수</th><th>뜻</th></tr>
-  {% set meaning = {"G1": "화이트리스트", "G2": "규칙으로 결론", "G3": "지문 캐시 재사용", "G5": "예산·서킷 → 규칙",
-                    "NOKEY": "LLM 키 없음 → 규칙", "LLM": "LLM 판정", "LLM-FLOOR": "LLM 판정(규칙 하한이 이김)",
-                    "LLM-ERR": "LLM 오류·스키마 실패 → 규칙", "LLM-REFUSAL": "LLM 거절 → 규칙", "MASK-LEAK": "마스킹 누출 차단 → 규칙"} %}
   {% for gate, n in u.by_gate|dictsort %}
-  <tr><td>{{ gate }}</td><td>{{ n|num }}</td><td>{{ meaning.get(gate, "") }}</td></tr>
+  <tr><td>{{ gate }}</td><td>{{ n|num }}</td><td>{{ gate_labels.get(gate, "") }}</td></tr>
   {% else %}
   <tr><td colspan="3" class="muted">아직 판정이 없습니다.</td></tr>
   {% endfor %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}대시보드 — mini-xdr 콘솔{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <h2>대시보드 <span class="muted">최근 {{ days }}일 · 날짜는 KST · 막대에 마우스를 올리면 숫자가 보입니다</span></h2>
+  <nav class="period">기간{% for d in choices %}<a href="/dashboard?days={{ d }}"{% if d == days %} class="on" aria-current="page"{% endif %}>{{ d }}일</a>{% endfor %}</nav>
+</div>
+<div class="stats">
+  <div class="stat"><span class="muted">이벤트(전체)</span><b>{{ stats.events|num }}</b></div>
+  <div class="stat"><span class="muted">인시던트(전체)</span><b>{{ stats.incidents|num }}</b></div>
+  <div class="stat"><span class="muted">열림</span><b>{{ stats.open_incidents|num }}</b></div>
+  <div class="stat"><span class="muted">다계층</span><b>{{ stats.multi_layer|num }}</b></div>
+  <div class="stat"><span class="muted">상관 대기</span><b>{{ stats.backlog|num }}</b></div>
+</div>
+
+<section class="card">
+  <div class="card-head"><h3>일별 이벤트 — 계층별 누적</h3><span class="muted">정규화된 이벤트 수(아래부터 app·host·network·data·behavior)</span></div>
+  {{ charts.daily }}
+  <div class="legend">{% for k in layers %}<span><i class="sw" style="background:{{ layer_colors[k] }}"></i>{{ k }} {{ layer_totals[k]|num }}</span>{% endfor %}</div>
+  <details><summary>표로 보기</summary><div class="scroll"><table>
+    <tr><th>날짜</th>{% for k in layers %}<th>{{ k }}</th>{% endfor %}<th>합계</th></tr>
+    {% for d in labels|reverse %}{% set ns = namespace(t=0) %}
+    <tr><td>{{ d }}</td>{% for k in layers %}{% set n = values.get((d, k), 0) %}{% set ns.t = ns.t + n %}<td>{{ n|num }}</td>{% endfor %}<td><b>{{ ns.t|num }}</b></td></tr>
+    {% endfor %}
+  </table></div></details>
+</section>
+
+<div class="grid2">
+  <section class="card">
+    <div class="card-head"><h3>인시던트 우선순위</h3><span class="muted">기간 안에 이벤트가 있었던 사건 · 미정 = 아직 판정 전</span></div>
+    {{ charts.priority }}
+    <details><summary>표로 보기</summary><table>
+      <tr><th>우선순위</th><th>열림</th><th>닫힘</th><th>합계</th></tr>
+      {% for p, s in priority_rows %}<tr><td>{{ p }}</td><td>{{ s.get('open', 0)|num }}</td><td>{{ s.get('closed', 0)|num }}</td><td><b>{{ (s.get('open', 0) + s.get('closed', 0))|num }}</b></td></tr>
+      {% else %}<tr><td colspan="4" class="muted">없음</td></tr>{% endfor %}
+    </table></details>
+  </section>
+  <section class="card">
+    <div class="card-head"><h3>AI 판정 경로(관문)</h3><span class="muted">LLM 까지 가지 않고 끝난 판정이 많을수록 토큰을 아낀 것</span></div>
+    {{ charts.gates }}
+    <details><summary>표로 보기</summary><table>
+      <tr><th>관문</th><th>뜻</th><th>건수</th></tr>
+      {% for g, n in gate_rows %}<tr><td>{{ g }}</td><td>{{ gate_labels.get(g, "") }}</td><td>{{ n|num }}</td></tr>
+      {% else %}<tr><td colspan="3" class="muted">없음</td></tr>{% endfor %}
+    </table></details>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head"><h3>이벤트가 많은 엔티티 Top 10</h3><span class="muted">기간 안에 활동한 인시던트의 이벤트 수(IP·계정·자산)</span></div>
+  {{ charts.entities }}
+  <details><summary>표로 보기</summary><div class="scroll"><table>
+    <tr><th>엔티티</th><th>이벤트</th><th>인시던트</th></tr>
+    {% for e in entities %}<tr><td>{{ e.entity_key }}</td><td>{{ e.events|num }}</td><td>{{ e.incidents|num }}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">없음</td></tr>{% endfor %}
+  </table></div></details>
+</section>
+{% endblock %}
